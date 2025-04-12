@@ -1,0 +1,5 @@
+.vs/
+src/MiniRTIC/bin/
+src/MiniRTIC/obj/
+src/OpenRTIC/bin/
+src/OpenRTIC/obj/

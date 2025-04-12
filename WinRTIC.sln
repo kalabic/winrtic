@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35931.197
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MiniRTIC", "src\MiniRTIC\MiniRTIC.csproj", "{62EC8283-686C-6567-0E6D-A5103358F749}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRTIC", "src\OpenRTIC\OpenRTIC.csproj", "{085AF914-96BF-2422-F3EC-BB614A5EA08F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{62EC8283-686C-6567-0E6D-A5103358F749}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{62EC8283-686C-6567-0E6D-A5103358F749}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{62EC8283-686C-6567-0E6D-A5103358F749}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{62EC8283-686C-6567-0E6D-A5103358F749}.Release|Any CPU.Build.0 = Release|Any CPU
+		{085AF914-96BF-2422-F3EC-BB614A5EA08F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{085AF914-96BF-2422-F3EC-BB614A5EA08F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{085AF914-96BF-2422-F3EC-BB614A5EA08F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{085AF914-96BF-2422-F3EC-BB614A5EA08F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FED6AE05-9FFB-4914-BA23-0DEBBFABE550}
+	EndGlobalSection
+EndGlobal
