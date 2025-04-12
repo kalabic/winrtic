@@ -1,5 +1,7 @@
 ﻿using OpenAI.RealtimeConversation;
 
+namespace MiniRTIC;
+
 #pragma warning disable OPENAI002
 
 public partial class Program

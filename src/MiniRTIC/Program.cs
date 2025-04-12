@@ -6,8 +6,9 @@ using System.ClientModel;
 using OpenRTIC.Config;
 using OpenRTIC.Conversation;
 using OpenRTIC.BasicDevices;
-using MiniRTIC;
 using System.Net.WebSockets;
+
+namespace MiniRTIC;
 
 #pragma warning disable OPENAI002
 
@@ -46,7 +47,7 @@ public partial class Program
             var options = GetDefaultConversationSessionOptions();
             session.ConfigureSession(options, startCancellationSource.Token);
         }
-        catch (TaskCanceledException ex)
+        catch (TaskCanceledException)
         {
             Console.WriteLine("Canceled");
             return;
