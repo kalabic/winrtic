@@ -31,8 +31,11 @@ public partial class Program
 
         ConsoleCancelEventHandler sessionCanceler = (sender, e) =>
         {
+#if DEBUG
+            Console.Write("[ Ctrl-C ]");
+#endif
             e.Cancel = true; // Execution continues after the delegate.
-            cancellationTokenSource.Cancel();
+            programCancellationSource.Cancel();
         };
         Console.CancelKeyPress += sessionCanceler;
     }

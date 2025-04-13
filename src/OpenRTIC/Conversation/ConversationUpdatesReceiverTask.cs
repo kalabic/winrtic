@@ -73,13 +73,7 @@ public class ConversationUpdatesReceiverTask : ConversationUpdatesReceiver
         }
     }
 
-    public long CancelAndStopAll()
-    {
-        var taskList = GetTaskList();
-        return TaskTool.StopWaitAll(taskList);
-    }
-
-    private List<TaskWithEvents> GetTaskList()
+    public List<TaskWithEvents> GetTaskList()
     {
         List<TaskWithEvents> list = new();
         list.Add(this);

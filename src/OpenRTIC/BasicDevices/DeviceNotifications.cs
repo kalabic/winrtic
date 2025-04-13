@@ -7,6 +7,11 @@ public class DeviceNotifications
         Console.WriteLine(" >>> Exception occured: " + ex.GetType().ToString() + "; Message: " + ex.Message);
     }
 
+    static public void ObjectDisposed(string label)
+    {
+        Console.WriteLine(" >>> Disposed: " + label);
+    }
+
     static public void ObjectDisposed(object obj)
     {
         Console.WriteLine(" >>> Disposed: " + obj.GetType().ToString());

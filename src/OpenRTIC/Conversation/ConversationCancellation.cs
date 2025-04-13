@@ -6,34 +6,40 @@ public class ConversationCancellation
     {
         if (externalToken is not null)
         {
-            shellCanceler = CancellationTokenSource.CreateLinkedTokenSource((CancellationToken)externalToken);
+            _shellCanceler = CancellationTokenSource.CreateLinkedTokenSource((CancellationToken)externalToken);
         }
         else
         {
-            shellCanceler = new CancellationTokenSource();
+            _shellCanceler = new CancellationTokenSource();
         }
-        speechCanceler = new CancellationTokenSource();
-        microphoneCanceler = CancellationTokenSource.CreateLinkedTokenSource(shellCanceler.Token);
-        webSocketCanceler = new CancellationTokenSource();
+        _speechCanceler = new CancellationTokenSource();
+        _microphoneCanceler = CancellationTokenSource.CreateLinkedTokenSource(_shellCanceler.Token);
+        _webSocketCanceler = new CancellationTokenSource();
+    }
+
+    public bool IsMicrophoneCancelled { get { return _microphoneCanceler.IsCancellationRequested; } }
+
+    public void CancelMicrophone()
+    {
+        _microphoneCanceler.Cancel();
     }
 
 
+    public CancellationToken ShellToken { get { return _shellCanceler.Token; } }
 
-    public CancellationToken ShellToken { get { return shellCanceler.Token; } }
+    public CancellationToken SpeechToken { get { return _speechCanceler.Token; } }
 
-    public CancellationToken SpeechToken { get { return speechCanceler.Token; } }
+    public CancellationToken MicrophoneToken { get { return _microphoneCanceler.Token; } }
 
-    public CancellationToken MicrophoneToken { get { return microphoneCanceler.Token; } }
-
-    public CancellationToken WebSocketToken { get { return webSocketCanceler.Token; } }
-
+    public CancellationToken WebSocketToken { get { return _webSocketCanceler.Token; } }
 
 
-    protected CancellationTokenSource shellCanceler;
 
-    protected CancellationTokenSource speechCanceler;
+    protected CancellationTokenSource _shellCanceler;
 
-    protected CancellationTokenSource microphoneCanceler;
+    protected CancellationTokenSource _speechCanceler;
 
-    protected CancellationTokenSource webSocketCanceler;
+    protected CancellationTokenSource _microphoneCanceler;
+
+    protected CancellationTokenSource _webSocketCanceler;
 }

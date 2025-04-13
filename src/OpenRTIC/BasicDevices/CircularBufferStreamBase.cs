@@ -33,18 +33,15 @@ public class CircularBufferStreamBase : Stream, IDisposable
         {
             lock (lockObject)
             {
-
-                streamEvent.Dispose();
-
                 if (streamBuffer is not null)
                 {
                     streamBuffer.Reset();
                     streamBuffer = null;
-#if DEBUG_VERBOSE
-                    DeviceNotifications.ObjectDisposed(this);
-#endif
                 }
             }
+#if DEBUG_VERBOSE_DISPOSE
+            DeviceNotifications.ObjectDisposed(this);
+#endif
         }
 
         // Release unmanaged resources.
@@ -90,7 +87,7 @@ public class CircularBufferStreamBase : Stream, IDisposable
         {
             return true;
         }
-        else if (available < 0)
+        else if (available < 0 || streamCancellation.IsCancellationRequested)
         {
             // streamBuffer is null
             return false;
@@ -110,10 +107,6 @@ public class CircularBufferStreamBase : Stream, IDisposable
                 if (timeoutMs > 0)
                 {
                     index = WaitHandle.WaitAny(waitHandles, timeoutMs);
-                    if (index == WaitHandle.WaitTimeout)
-                    {
-                        return false;
-                    }
                 }
                 else
                 {
@@ -133,7 +126,15 @@ public class CircularBufferStreamBase : Stream, IDisposable
                         return false;
                     }
                 }
-                /* FYI: else if (index == 1) - streamCancellation.WaitHandle */
+                else if (index == 1)
+                {
+                    // streamCancellation.WaitHandle
+                    return false;
+                }
+                else if (index == WaitHandle.WaitTimeout)
+                {
+                    return false;
+                }
             }
         }
         catch (Exception ex)

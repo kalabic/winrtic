@@ -4,7 +4,7 @@ namespace OpenRTIC.MiniTaskLib;
 
 public class TaskTool
 {
-    static public long StopWaitAll(List<TaskWithEvents> taskList, int timeoutMs = -1)
+    static public long CancelStopDisposeAll(List<TaskWithEvents> taskList, int timeoutMs = -1)
     {
         var runningTasks = new List<TaskWithEvents>();
         foreach (var task in taskList)
@@ -13,9 +13,12 @@ public class TaskTool
             {
                 runningTasks.Add(task);
             }
+            else
+            {
+                task.Dispose();
+            }
         }
 
-        long taskStoppingElapsed = 0;
         if (runningTasks.Count > 0)
         {
             var stopwatch = new Stopwatch();
@@ -33,9 +36,9 @@ public class TaskTool
                 stopCanceler.Cancel();
                 return -1;
             }
-            taskStoppingElapsed = stopwatch.ElapsedMilliseconds;
+            return stopwatch.ElapsedMilliseconds;
         }
 
-        return taskStoppingElapsed;
+        return 0;
     }
 }

@@ -7,6 +7,7 @@ using OpenRTIC.Config;
 using OpenRTIC.Conversation;
 using OpenRTIC.BasicDevices;
 using System.Net.WebSockets;
+using OpenRTIC.MiniTaskLib;
 
 namespace MiniRTIC;
 
@@ -23,9 +24,9 @@ namespace MiniRTIC;
 public partial class Program
 {
     /// <summary>
-    /// Connected to <see cref="Console.CancelKeyPress"/> when <see cref="InitializeEnvironment"/> is invoked. 
+    /// Connected to <see cref="Console.CancelKeyPress"/> when <see cref="InitializeEnvironment"/> is invoked.
     /// </summary>
-    static private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+    static private readonly CancellationTokenSource programCancellationSource = new CancellationTokenSource();
 
     public static void Main(string[] args)
     {
@@ -42,7 +43,7 @@ public partial class Program
         RealtimeConversationSession? session = null;
         try
         {
-            var startCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokenSource.Token);
+            var startCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(programCancellationSource.Token);
             session = client.StartConversationSession(startCancellationSource.Token);
             var options = GetDefaultConversationSessionOptions();
             session.ConfigureSession(options, startCancellationSource.Token);
@@ -58,10 +59,12 @@ public partial class Program
             return;
         }
 
-        var cancellation = cancellationTokenSource.Token;
-        var speaker = new SpeakerAudioStream(ConversationUpdatesReceiver.AudioFormat, cancellation);
-        var microphone = new MicrophoneAudioStream(ConversationUpdatesReceiver.AudioFormat, cancellation);
-        var updatesReceiver = new ConversationUpdatesReceiverTask(session, microphone, cancellation);
+        var deviceCancellationSource = new CancellationTokenSource();
+        var deviceCancellation = deviceCancellationSource.Token;
+        var speaker = new SpeakerAudioStream(ConversationUpdatesReceiver.AudioFormat, deviceCancellation);
+        var microphone = new MicrophoneAudioStream(ConversationUpdatesReceiver.AudioFormat, deviceCancellation);
+
+        var updatesReceiver = new ConversationUpdatesReceiverTask(session, microphone, programCancellationSource.Token);
 
         //
         // 'Hello' sample that will be enqueued into audio input stream when session starts.
@@ -157,10 +160,15 @@ public partial class Program
         });
 
         updatesReceiver.Run();
-        console.EndSession();
 
-#if DEBUG
-        long finishMs = updatesReceiver.CancelAndStopAll();
+        console.EndSession();
+        deviceCancellationSource.Cancel();
+
+        var taskList = updatesReceiver.GetTaskList();
+#if !DEBUG
+        TaskTool.CancelStopDisposeAll(taskList);
+#else
+        long finishMs = TaskTool.CancelStopDisposeAll(taskList);
         if (finishMs >= 0)
         {
             Console.WriteLine($" * Info: It took {finishMs} ms to close session.");
@@ -170,6 +178,10 @@ public partial class Program
             Console.WriteLine(" * Error: Failed to finish session. Device tasks still running.");
         }
 #endif
+
+        // 'Close' is invoked from 'Dispose' for Stream based classes
+        microphone.Dispose();
+        speaker.Dispose();
     }
 
     private static RealtimeConversationClient GetConfiguredClient(ClientApiConfig options)

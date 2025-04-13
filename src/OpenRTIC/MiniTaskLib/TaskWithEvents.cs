@@ -55,8 +55,15 @@ public abstract class TaskWithEvents : TaskBase
         if (disposing)
         {
             _taskEvents.Clear();
-#if DEBUG_VERBOSE
-            DeviceNotifications.ObjectDisposed(this);
+#if DEBUG_VERBOSE_DISPOSE
+            if (String.IsNullOrEmpty(_label))
+            {
+                DeviceNotifications.ObjectDisposed(this);
+            }
+            else
+            {
+                DeviceNotifications.ObjectDisposed(_label);
+            }
 #endif
         }
 
@@ -104,6 +111,9 @@ public abstract class TaskWithEvents : TaskBase
         }, stopActionCancellation);
 #if DEBUG
         stopTask.SetLabel("Stop Task For [" + _label + "]");
+#if DEBUG_VERBOSE
+        Console.WriteLine("Task created: " + stopTask._label);
+#endif
 #endif
         stopTask.Start();
         return stopTask;
