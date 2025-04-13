@@ -16,8 +16,10 @@ public abstract class ConversationUpdatesDispatcher : ForwardedEventQueue
 {
     protected ConversationUpdatesInfo _sessionState = new();
 
-    protected ConversationUpdatesDispatcher(CancellationToken? cancellation = null)
-        : base(cancellation)
+    protected ConversationUpdatesDispatcher()
+        : this(CancellationToken.None) { }
+
+    protected ConversationUpdatesDispatcher(CancellationToken cancellation)
     {
 #if DEBUG
         SetLabel("Updates Dispatcher");

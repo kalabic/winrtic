@@ -15,7 +15,13 @@ public class ConversationUpdatesReceiverTask : IDisposable
     // Just in case, let's keep connection opening timeout under 20  sec.
     private const int START_TASK_TIMEOUT = 20000;
 
-    public EventCollection ReceiverEvents { get { return _receiverEvents; } }
+    private const int STOP_TASK_TIMEOUT = 10000;
+
+    public EventCollection ReceiverQueueEvents { get { return _receiverQueueEvents; } }
+
+    public EventCollection ReceiverEvents { get { return _receiver.ReceiverEvents; } }
+
+    public ForwardedEventQueue Queue {  get { return _receiver; } }
 
     private const int AUDIO_INPUT_STREAM_BUFFER = 4096;
 
@@ -31,11 +37,11 @@ public class ConversationUpdatesReceiverTask : IDisposable
 
     private RealtimeConversationClient _client;
 
-    private ConversationUpdatesReceiver? _receiver = null;
+    private ConversationUpdatesReceiver _receiver;
 
     private CancellationToken _cancellation;
 
-    private EventCollection _receiverEvents = new();
+    private EventCollection _receiverQueueEvents = new();
 
     public ConversationUpdatesReceiverTask(RealtimeConversationClient client,
                                            Stream audioInputStream,
@@ -43,14 +49,20 @@ public class ConversationUpdatesReceiverTask : IDisposable
     {
         this._client = client;
         this._audioInputStream = audioInputStream;
+        this._receiver = new ConversationUpdatesReceiver();
         this._cancellation = cancellation;
 
         //
         // Events sent from this class.
         //
-        _receiverEvents.EnableInvokeFor<SendAudioTaskFinished>();
-        _receiverEvents.EnableInvokeFor<InputAudioTaskFinished>();
-        _receiverEvents.EnableInvokeFor<FailedToConnect>();
+        _receiverQueueEvents.EnableInvokeFor<InputAudioTaskFinished>();
+        _receiverQueueEvents.EnableInvokeFor<FailedToConnect>();
+
+        _receiver.ReceiverEvents.ConnectEventForwarder(
+            _receiver.NewQueuedEventForwarder<InputAudioTaskFinished>( (_, _) => HandleEvent_InputAudioTaskFinished() ));
+
+        _receiver.ReceiverEvents.ConnectEventForwarder(
+            _receiver.NewQueuedEventForwarder<FailedToConnect>((_, _) => HandleEvent_FailedToConnect() ));
     }
 
     public void Dispose()
@@ -59,41 +71,55 @@ public class ConversationUpdatesReceiverTask : IDisposable
         _sendAudioTask?.Dispose();
         _inputAudioTask?.Dispose();
         _audioInputStream.Dispose();
-        _receiver?.Dispose();
+        _receiver.Dispose();
     }
 
+    /// <summary>
+    /// Runs conversation session synchronously. By the time it returns, complete shutdown should have been initiated and done.
+    /// </summary>
     public void Run()
     {
-        CreateUpdatesReceiverTask();
-        _updatesReceiverTask?.RunSynchronously();
+        StartUpdatesReceiverTask();
+        _receiver.Run();
     }
 
-    public Task RunAsync()
+    public void RunAsync()
     {
-        CreateUpdatesReceiverTask();
-        if (_updatesReceiverTask is not null)
+        StartUpdatesReceiverTask();
+        _receiver.RunAsync();
+
+        // Assert all tasks here are complete when main task ends.
+        var actionAwaiter = _receiver.GetAwaiter();
+        if (actionAwaiter is not null)
         {
-            _updatesReceiverTask.Start();
-            return _updatesReceiverTask;
-        }
-        else
-        {
-            return Task.CompletedTask;
+            actionAwaiter.TaskEvents.ConnectEventHandler<TaskStateUpdate>( (_, update) => AssertAllTasksComplete(update) );
         }
     }
 
-    public void FinishReceiver()
+    public Task? GetAwaiter()
     {
-        _receiver?.FinishReceiver();
+        return _receiver.GetAwaiter();
     }
 
-    public List<TaskWithEvents> GetTaskList()
+    /// <summary>
+    /// Initiates end of conversation session and returns immediatelly. Should be used only when receiver is running
+    /// in asynchronous mode. Shutdown always begings with stopping audio input tasks. In fact, if they are completed 
+    /// or broken for any reason that alone should trigger end of session and complete shutdown by itself.
+    /// </summary>
+    public void Cancel()
+    {
+        _receiver.CancelMicrophone();
+        _receiver.FinishReceiver();
+    }
+
+    /// <summary>
+    /// List of all tasks started by this class, with the exception of the 'awaiter' task, 'awaiter' exists when receiver is
+    /// running in asynchronous mode and should not be included in this list.
+    /// </summary>
+    /// <returns></returns>
+    private List<TaskWithEvents> GetTaskList()
     {
         List<TaskWithEvents> list = new();
-        if (_receiver is not null)
-        {
-            list.Add(_receiver);
-        }
         if (_updatesReceiverTask is not null)
         {
             list.Add(_updatesReceiverTask);
@@ -109,7 +135,29 @@ public class ConversationUpdatesReceiverTask : IDisposable
         return list;
     }
 
-    private void CreateUpdatesReceiverTask()
+    private void AssertAllTasksComplete(TaskStateUpdate update)
+    {
+        if (update == TaskStateUpdate.Finished)
+        {
+            var taskList = GetTaskList();
+            foreach (var task in taskList)
+            {
+                if (!task.IsCompleted)
+                {
+                    task.Cancel(); // Here just cancel and don't wait. TODO: Notify
+#if DEBUG
+                    throw new InvalidOperationException();
+#endif
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Throws exception if updates receiver task already exists.
+    /// </summary>
+    /// <exception cref="InvalidOperationException"></exception>
+    private void StartUpdatesReceiverTask()
     {
         if (_updatesReceiverTask is null)
         {
@@ -117,6 +165,7 @@ public class ConversationUpdatesReceiverTask : IDisposable
 #if DEBUG
             _updatesReceiverTask.SetLabel("Updates Receiver");
 #endif
+            _updatesReceiverTask.Start();
         }
         else
         {
@@ -141,64 +190,68 @@ public class ConversationUpdatesReceiverTask : IDisposable
 #if DEBUG
         startWatchdog.SetLabel("Start Watchdog");
 #endif
-        startWatchdog.Start();
 
         RealtimeConversationSession? session = null;
+
 #if DEBUG_VERBOSE
         long startTimeMs = 0;
         var startStopwatch = new Stopwatch();
         startStopwatch.Start();
 #endif
+
+        startWatchdog.Start();
         try
         {
             session = _client.StartConversationSession(startCanceller.Token);
             var options = ConversationSessionConfig.GetDefaultConversationSessionOptions();
             session.ConfigureSession(options, startCanceller.Token);
-#if DEBUG_VERBOSE
-            startStopwatch.Stop();
-            startTimeMs = startStopwatch.ElapsedMilliseconds;
-#endif
         }
-        catch (TaskCanceledException)
+        catch (TaskCanceledException ex)
         {
-#if DEBUG_VERBOSE
-            startStopwatch.Stop();
-            startTimeMs = startStopwatch.ElapsedMilliseconds;
-#endif
+            //
+            // Cancellation by watchdog will throw here.
+            //
             session?.Dispose();
+            _receiver.FailedToConnect(ex.Message);
             return;
         }
         catch (WebSocketException ex)
         {
-#if DEBUG_VERBOSE
-            startStopwatch.Stop();
-            startTimeMs = startStopwatch.ElapsedMilliseconds;
-#endif
+            //
+            // When OpenAI.RealtimeConversation client gives up, it will throw here.
+            //
             session?.Dispose();
-            ReceiverEvents.Invoke<FailedToConnect>(new FailedToConnect(ex.Message));
+            _receiver.FailedToConnect(ex.Message);
             return;
         }
         finally
         {
             startWatchdog.Cancel();
 #if DEBUG_VERBOSE
+            startStopwatch.Stop();
+            startTimeMs = startStopwatch.ElapsedMilliseconds;
             Console.WriteLine($" >>> Start Stopwatch: {startTimeMs}");
 #endif
         }
 
         // 'Updates receiver' object has an additional task for invoking specific events.
-        _receiver = new ConversationUpdatesReceiver(session);
+        _receiver.SetSession(session);
 
         // To have event handlers be invoked from that additional task, it is necessary to register event forwarders.
-        _receiver.ForwardToOtherUsingQueue(_receiverEvents);
+        _receiver.ForwardToOtherUsingQueue(_receiverQueueEvents);
 
         // 'Session Started Update' event is a good time to start sending microphone input to the server.
-        _receiverEvents.ConnectEventHandler<ConversationSessionStartedUpdate>((_, _) => StartAudioInputTask());
+        _receiverQueueEvents.ConnectEventHandler<ConversationSessionStartedUpdate>((_, _) => StartAudioInputTask());
 
         _receiver.ReceiveUpdates(receiverTaskCancellation);
     }
 
-    public void StartAudioInputTask()
+    /// <summary>
+    /// Invoked from event handler for <see cref="ConversationSessionStartedUpdate"/>. Memeber <see cref="UpdatesReceiverEntry"/>
+    /// prepares it if session was created sucessfully.
+    /// </summary>
+    /// <exception cref="InvalidOperationException"></exception>
+    private void StartAudioInputTask()
     {
         if (_receiver is null)
         {
@@ -275,16 +328,50 @@ public class ConversationUpdatesReceiverTask : IDisposable
         });
     }
 
-    public void AssureAudioCancelled()
+    private void AssureAudioCancelled()
     {
+        _receiver.CancelMicrophone();
+
         if (Interlocked.Decrement(ref _audioTaskCount) == 0)
         {
-            ReceiverEvents.Invoke<InputAudioTaskFinished>(new InputAudioTaskFinished());
+            _receiver.AudioInputFinished();
         }
-        if ((_receiver is not null) && !_receiver.Cancellation.IsMicrophoneCancelled)
+    }
+
+    /// <summary>
+    /// This ends it all with main message queue included.
+    /// <para>NOTE: This is internal event handler, user of public API or any task othen than internal message queue
+    /// should never end up in it.</para>
+    /// </summary>
+    private void HandleEvent_InputAudioTaskFinished()
+    {
+        _receiver.FinishReceiver(); // This should start graceful shutdown of '_updatesReceiverTask'.
+
+        InternalCancelStopDisposeAll();
+        _receiver.CloseMessageQueue(); // The end.
+    }
+
+    private void HandleEvent_FailedToConnect()
+    {
+        InternalCancelStopDisposeAll();
+        _receiver.CloseMessageQueue(); // The end.
+    }
+
+    private void InternalCancelStopDisposeAll()
+    {
+        var taskList = GetTaskList();
+#if !DEBUG
+        TaskTool.CancelStopDisposeAll(taskList, STOP_TASK_TIMEOUT);
+#else
+        long finishMs = TaskTool.CancelStopDisposeAll(taskList, STOP_TASK_TIMEOUT);
+        if (finishMs >= 0)
         {
-            _receiver.Cancellation.CancelMicrophone();
+            DeviceNotifications.Info($"It took {finishMs} ms to close session.");
         }
-        _receiver?.FinishReceiver();
+        else
+        {
+            DeviceNotifications.Error("Failed to finish session. Device tasks still running.");
+        }
+#endif
     }
 }

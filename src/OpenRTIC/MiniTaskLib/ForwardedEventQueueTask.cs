@@ -2,36 +2,17 @@
 
 namespace OpenRTIC.MiniTaskLib;
 
-public class ForwardedEventQueue : MessageQueueFunction<IInvokeForwardedEvent>
+public class ForwardedEventQueueTask : MessageQueueTask<IInvokeForwardedEvent>
 {
     private Collection<EventForwarderBase> _forwarders = new();
 
-    public EventCollection TaskEvents { get { return _events; } }
+    public ForwardedEventQueueTask()
+        : base()
+    { }
 
-
-    private EventCollection _events = new();
-
-    private CancellationTokenSource _cancellationSource;
-
-
-    public ForwardedEventQueue()
-        : this(new CancellationTokenSource()) { }
-
-    private ForwardedEventQueue(CancellationTokenSource cancellationSource)
-        : base(cancellationSource.Token)
-    {
-        this._cancellationSource = cancellationSource;
-
-        // TODO: Add an API for following steps:
-        _events.EnableInvokeFor<CloseMessageQueue>();
-        _events.ConnectEventForwarder(
-            NewQueuedEventForwarder<CloseMessageQueue>(
-                (_, update) => TryWriteFinalMessage(
-                    new FinalMessage( 
-                        () => { 
-                            _cancellationSource.Cancel(); 
-                        } ))));
-    }
+    public ForwardedEventQueueTask(CancellationToken cancellation)
+        : base(cancellation)
+    { }
 
     override protected void Dispose(bool disposing)
     {

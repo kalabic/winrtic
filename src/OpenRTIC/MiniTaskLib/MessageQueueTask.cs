@@ -3,7 +3,7 @@ using OpenRTIC.BasicDevices;
 
 namespace OpenRTIC.MiniTaskLib;
 
-public abstract class MessageQueueTask<TMessage> : TaskWithEvents
+public abstract class MessageQueueTask<TMessage> : TaskWithEvents, IQueueWriter<TMessage>
 {
     private object _channelLock = new object();
 
@@ -15,7 +15,11 @@ public abstract class MessageQueueTask<TMessage> : TaskWithEvents
     public bool IsMessageQueueComplete { get { return _channelIsComplete; } }
 
 
-    public MessageQueueTask(CancellationToken? cancellation = null)
+    public MessageQueueTask()
+        : base()
+    { }
+
+    public MessageQueueTask(CancellationToken cancellation)
         : base(cancellation)
     { }
 
@@ -75,5 +79,10 @@ public abstract class MessageQueueTask<TMessage> : TaskWithEvents
         }
 #endif
         return result;
+    }
+
+    public bool TryWriteFinalMessage(TMessage message)
+    {
+        throw new NotImplementedException();
     }
 }

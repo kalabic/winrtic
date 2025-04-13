@@ -112,17 +112,17 @@ public class EventCollection
         throw new ArgumentException("Attempted to access non-existent event type in EventSourceCollection.");
     }
 
-    public EventForwarder<TMessage> GetEventForwarder<TMessage>(ForwardedEventQueue destinationQueue)
+    public EventForwarder<TMessage> GetEventForwarder<TMessage>(IQueueWriter<IInvokeForwardedEvent> destinationQueue)
     {
         return new EventForwarder<TMessage>(destinationQueue, GetEventContainer<TMessage>());
     }
 
-    public void ForwardFromOtherUsingQueue<TMessage>(EventCollection other, ForwardedEventQueue destinationQueue)
+    public void ForwardFromOtherUsingQueue<TMessage>(EventCollection other, IQueueWriter<IInvokeForwardedEvent> destinationQueue)
     {
         other.ConnectEventForwarder<TMessage>(GetEventForwarder<TMessage>(destinationQueue));
     }
 
-    public void AddEventAndForwardFromOtherUsingQueue<TMessage>(EventCollection other, ForwardedEventQueue destinationQueue)
+    public void AddEventAndForwardFromOtherUsingQueue<TMessage>(EventCollection other, IQueueWriter<IInvokeForwardedEvent> destinationQueue)
     {
         if (Exists<TMessage>())
         {
@@ -170,6 +170,46 @@ public class EventCollection
                 foreach (var item in items)
                 {
                     item.ConnectEventHandler(eventHandler);
+                }
+            }
+        }
+    }
+
+    public void ConnectEventHandlerAsync<TMessage>(EventHandler<TMessage> eventHandler)
+    {
+        ConnectEventHandlerAsync(true, eventHandler);
+    }
+
+    public void ConnectEventHandlerAsync<TMessage>(bool assertEventExists, EventHandler<TMessage> eventHandler)
+    {
+        var asyncEventHandler = new EventHandler<TMessage>(
+            (sender, message) => Task.Run(() => eventHandler.Invoke(sender, message)));
+
+        var items = collection.OfType<EventContainer<TMessage>>();
+        if (items.Count() > 1)
+        {
+            throw new ArgumentException("Attempted to access duplicated event type in EventSourceCollection.");
+        }
+        else if (items.Count() == 1)
+        {
+            foreach (var item in items)
+            {
+                item.ConnectEventHandlerAsync(asyncEventHandler);
+            }
+        }
+        else
+        {
+            if (assertEventExists)
+            {
+                throw new ArgumentException("Attempted to access non-existent event type in EventSourceCollection.");
+            }
+            else
+            {
+                EnableInvokeFor<TMessage>();
+                var newItems = collection.OfType<EventContainer<TMessage>>();
+                foreach (var item in items)
+                {
+                    item.ConnectEventHandlerAsync(asyncEventHandler);
                 }
             }
         }

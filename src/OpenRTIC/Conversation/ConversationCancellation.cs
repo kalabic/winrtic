@@ -2,16 +2,17 @@
 
 public class ConversationCancellation
 {
-    public ConversationCancellation(CancellationToken? externalToken = null)
+    public ConversationCancellation()
     {
-        if (externalToken is not null)
-        {
-            _shellCanceler = CancellationTokenSource.CreateLinkedTokenSource((CancellationToken)externalToken);
-        }
-        else
-        {
-            _shellCanceler = new CancellationTokenSource();
-        }
+        _shellCanceler = new CancellationTokenSource();
+        _speechCanceler = new CancellationTokenSource();
+        _microphoneCanceler = CancellationTokenSource.CreateLinkedTokenSource(_shellCanceler.Token);
+        _webSocketCanceler = new CancellationTokenSource();
+    }
+
+    public ConversationCancellation(CancellationToken externalToken)
+    {
+        _shellCanceler = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
         _speechCanceler = new CancellationTokenSource();
         _microphoneCanceler = CancellationTokenSource.CreateLinkedTokenSource(_shellCanceler.Token);
         _webSocketCanceler = new CancellationTokenSource();

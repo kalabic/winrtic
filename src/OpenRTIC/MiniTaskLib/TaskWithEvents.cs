@@ -22,19 +22,18 @@ public abstract class TaskWithEvents : TaskBase
 
     private string _label = "";
 
-
-    public TaskWithEvents(CancellationToken? cancellation = null)
-    // 'false' so in base class both CanBeCanceled and IsCancellationRequested will be false.
-        : base(new CancellationToken(false))
+    public TaskWithEvents()
+        : base(CancellationToken.None, TaskCreationOptions.LongRunning)
     {
-        if (cancellation is not null)
-        {
-            _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource((CancellationToken)cancellation);
-        }
-        else
-        {
-            _cancellationTokenSource = new CancellationTokenSource();
-        }
+        _cancellationTokenSource = new CancellationTokenSource();
+        _taskEvents.EnableInvokeFor<TaskExceptionOccured>();
+        _taskEvents.EnableInvokeFor<TaskStateUpdate>();
+    }
+
+    public TaskWithEvents(CancellationToken cancellation)
+        : base(CancellationToken.None, TaskCreationOptions.LongRunning)
+    {
+        _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         _taskEvents.EnableInvokeFor<TaskExceptionOccured>();
         _taskEvents.EnableInvokeFor<TaskStateUpdate>();
     }

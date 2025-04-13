@@ -26,4 +26,9 @@ public class DeviceNotifications
     {
         Console.WriteLine(" >>> Error: " + errorMessage);
     }
+
+    static public void Info(string infoMessage)
+    {
+        Console.WriteLine(" >>> Info: " + infoMessage);
+    }
 }

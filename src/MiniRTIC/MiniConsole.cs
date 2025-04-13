@@ -89,6 +89,14 @@ public class MiniConsole
         }
     }
 
+    public void WriteWarning(string text)
+    {
+        if (AssertNotCancelled())
+        {
+            Console.WriteLine("[ Warning: " + text + "]");
+        }
+    }
+
     public void StartSession()
     {
         _sessionStarted = true;
@@ -106,17 +114,13 @@ public class MiniConsole
             if (_receivingItem)
             {
                 _receivingItem = false;
-                _timer.Start();
                 Console.WriteLine("");
                 Console.WriteLine("");
-            }
-            else
-            {
-                _timer.Stop();
             }
 
             Console.WriteLine("SESSION ENDED");
         }
+        _timer.Stop();
     }
 
     public void SetStateReceivingItem()

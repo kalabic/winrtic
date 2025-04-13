@@ -16,25 +16,28 @@ public class ConversationUpdatesReceiver : ConversationUpdatesDispatcher
 
     public ConversationCancellation Cancellation { get { return _cancellation; } }
 
+    public bool IsWebSocketOpen { get { return (_session is not null) ? (_session.WebSocket.State == WebSocketState.Open) : false; } }
+
 
     protected ConversationCancellation _cancellation;
 
     protected EventCollection _receiverEvents = new();
 
-    protected RealtimeConversationSession _session;
+    protected RealtimeConversationSession? _session = null;
 
 
-    public ConversationUpdatesReceiver(RealtimeConversationSession session,
-                                       CancellationToken? cancellation = null)
+    public ConversationUpdatesReceiver()
+        : this(CancellationToken.None) { }
+
+    public ConversationUpdatesReceiver(CancellationToken cancellation)
     {
         this._cancellation = new ConversationCancellation(cancellation);
-        this._session = session;
 
         // Register events collection in this class to be invoked from base receiver's forwarded event queue task.
         base.ForwardToOtherUsingQueue(_receiverEvents);
 
-        // Start 'forwarded event queue'.
-        Start();
+        _receiverEvents.EnableInvokeFor<InputAudioTaskFinished>();
+        _receiverEvents.EnableInvokeFor<FailedToConnect>();
     }
 
     override protected void Dispose(bool disposing)
@@ -43,18 +46,54 @@ public class ConversationUpdatesReceiver : ConversationUpdatesDispatcher
         if (disposing)
         {
             _receiverEvents.Clear();
-            _session.Dispose();
+            _session?.Dispose();
         }
 
         // Release unmanaged resources.
         base.Dispose(disposing);
     }
 
+    public void Run()
+    {
+        MessageQueueEntry(CancellationToken.None);
+        // TODO: Check that receiver was in fact properly finished.
+    }
+
+    public void RunAsync()
+    {
+        MessageQueueEntryAsync(CancellationToken.None);
+    }
+
+    public void SetSession(RealtimeConversationSession session)
+    {
+        this._session = session;
+    }
+
+    public void CancelMicrophone()
+    {
+        _cancellation.CancelMicrophone();
+    }
+
+    public void AudioInputFinished()
+    {
+        _receiverEvents.Invoke<InputAudioTaskFinished>(new InputAudioTaskFinished());
+    }
+
+    public void FailedToConnect(string message)
+    {
+        _receiverEvents.Invoke<FailedToConnect>(new FailedToConnect(message));
+    }
+
+    public void CloseMessageQueue()
+    {
+        TaskEvents.Invoke<CloseMessageQueue>(new CloseMessageQueue());
+    }
+
     public void InterruptResponse()
     {
         HandleSessionExceptions(() =>
         {
-            _session.InterruptResponseAsync();
+            _session?.InterruptResponseAsync();
         });
     }
 
@@ -65,7 +104,7 @@ public class ConversationUpdatesReceiver : ConversationUpdatesDispatcher
             _sessionState.receiverState = ConversationReceiverState.FinishAfterResponse;
             HandleSessionExceptions(() =>
             {
-                _session.InterruptResponseAsync();
+                _session?.InterruptResponseAsync();
             });
         }
     }
@@ -74,17 +113,17 @@ public class ConversationUpdatesReceiver : ConversationUpdatesDispatcher
     {
         HandleSessionExceptions( () =>
         {
-            if (_session.WebSocket.State == WebSocketState.Open)
+            if (IsWebSocketOpen)
             {
-                _session.SendInputAudio(audioStream, cancellation);
+                _session?.SendInputAudio(audioStream, cancellation);
             }
         });
 
         HandleSessionExceptions( () =>
         {
-            if (_session.WebSocket.State == WebSocketState.Open)
+            if (IsWebSocketOpen)
             {
-                _session.ClearInputAudio();
+                _session?.ClearInputAudio();
             }
         });
     }
@@ -93,7 +132,7 @@ public class ConversationUpdatesReceiver : ConversationUpdatesDispatcher
     {
         await HandleSessionExceptionsAsync(async () =>
         {
-            if (_session.WebSocket.State == WebSocketState.Open)
+            if ((_session is not null) && IsWebSocketOpen)
             {
                 await _session.SendInputAudioAsync(audioStream, cancellation);
             }
@@ -101,7 +140,7 @@ public class ConversationUpdatesReceiver : ConversationUpdatesDispatcher
 
         await HandleSessionExceptionsAsync(async () =>
         {
-            if (_session.WebSocket.State == WebSocketState.Open)
+            if ((_session is not null) && IsWebSocketOpen)
             {
                 await _session.ClearInputAudioAsync();
             }
@@ -110,18 +149,23 @@ public class ConversationUpdatesReceiver : ConversationUpdatesDispatcher
 
     public void ReceiveUpdates(CancellationToken cancellation)
     {
-        HandleSessionExceptionsAsync( async () =>
+        var task = HandleSessionExceptionsAsync(async () =>
         {
-            _sessionState.receiverState = ConversationReceiverState.Connected;
-            await foreach (ConversationUpdate update in _session.ReceiveUpdatesAsync(_cancellation.WebSocketToken))
+            if (_session is not null)
             {
-                if (!DispatchAndProcess(update))
+                _sessionState.receiverState = ConversationReceiverState.Connected;
+                await foreach (ConversationUpdate update in _session.ReceiveUpdatesAsync(_cancellation.WebSocketToken))
                 {
-                    break;
+                    if (!DispatchAndProcess(update))
+                    {
+                        break;
+                    }
                 }
+                _sessionState.receiverState = ConversationReceiverState.Disconnected;
             }
-            _sessionState.receiverState = ConversationReceiverState.Disconnected;
-        }).Wait(cancellation);
+        });
+
+        HandleSessionExceptions( () => task.Wait() );
     }
 
     protected async Task ReceiveUpdatesAsync()
@@ -129,11 +173,14 @@ public class ConversationUpdatesReceiver : ConversationUpdatesDispatcher
         _sessionState.receiverState = ConversationReceiverState.Connected;
         await HandleSessionExceptionsAsync(async () =>
         {
-            await foreach (ConversationUpdate update in _session.ReceiveUpdatesAsync(_cancellation.WebSocketToken))
+            if (_session is not null)
             {
-                if (!DispatchAndProcess(update))
+                await foreach (ConversationUpdate update in _session.ReceiveUpdatesAsync(_cancellation.WebSocketToken))
                 {
-                    break;
+                    if (!DispatchAndProcess(update))
+                    {
+                        break;
+                    }
                 }
             }
         });
@@ -162,13 +209,16 @@ public class ConversationUpdatesReceiver : ConversationUpdatesDispatcher
 
         if (_sessionState.receiverState == ConversationReceiverState.Disconnecting)
         {
-            WebSocket socket = _session.WebSocket;
-            if (socket.State == WebSocketState.Open)
+            if (IsWebSocketOpen)
             {
                 HandleSessionExceptions(() =>
                 {
-                    _ = socket.CloseOutputAsync(
-                        WebSocketCloseStatus.NormalClosure, null, _cancellation.WebSocketToken);
+                    var socket = _session?.WebSocket;
+                    if (socket != null)
+                    {
+                        _ = socket.CloseOutputAsync(
+                            WebSocketCloseStatus.NormalClosure, null, _cancellation.WebSocketToken);
+                    }
                 });
                 return true;
             }

@@ -1,4 +1,6 @@
-﻿using Azure.AI.OpenAI;
+﻿#define RUN_SYNC
+
+using Azure.AI.OpenAI;
 using Azure.Identity;
 using OpenAI;
 using OpenAI.RealtimeConversation;
@@ -6,7 +8,6 @@ using System.ClientModel;
 using OpenRTIC.Config;
 using OpenRTIC.Conversation;
 using OpenRTIC.BasicDevices;
-using OpenRTIC.MiniTaskLib;
 
 namespace MiniRTIC;
 
@@ -27,7 +28,13 @@ public partial class Program
     /// </summary>
     static private readonly CancellationTokenSource programCanceller = new CancellationTokenSource();
 
+    static private CancellationToken GetCancellationToken() => programCanceller.Token;
+
+#if RUN_SYNC
     public static void Main(string[] args)
+#else
+    public static async Task Main(string[] args)
+#endif
     {
         // Set UTF-8, handle Ctrl-C, etc.
         InitializeEnvironment();
@@ -36,31 +43,32 @@ public partial class Program
         var client = GetConfiguredClient(config);
 
         //
-        // Create devices, register to be notified about some events and run!
+        // Create devices, register to be notified about some receiverQueueEvents and run!
         //
-        var speaker = new SpeakerAudioStream(ConversationSessionConfig.AudioFormat, programCanceller.Token);
-        var microphone = new MicrophoneAudioStream(ConversationSessionConfig.AudioFormat, programCanceller.Token);
-        var console = new MiniConsole(() => speaker.GetBufferedMs() ,programCanceller.Token); // A small console handling text output in a more friendly way.
-        var updatesReceiver = new ConversationUpdatesReceiverTask(client, microphone, programCanceller.Token);
+        var speaker = new SpeakerAudioStream(ConversationSessionConfig.AudioFormat, GetCancellationToken());
+        var microphone = new MicrophoneAudioStream(ConversationSessionConfig.AudioFormat, GetCancellationToken());
+        var console = new MiniConsole(() => speaker.GetBufferedMs() , GetCancellationToken()); // A small console handling text output in a more friendly way.
+        var updatesReceiver = new ConversationUpdatesReceiverTask(client, microphone, GetCancellationToken());
 
         //
-        // A collection of events to listen on, will be invoked from a task that is not used
+        // A collection of receiverQueueEvents to listen on, will be invoked from a task that is not used
         // for fetching conversation updates.
         //
-        var events = updatesReceiver.ReceiverEvents;
+        var receiverEvents = updatesReceiver.ReceiverEvents;
+        var receiverQueueEvents = updatesReceiver.ReceiverQueueEvents;
 
         //
-        // ConversationSessionStartedUpdate
+        // FailedToConnect
         //
-        events.ConnectEventHandler<FailedToConnect>((_, update) =>
+        receiverEvents.ConnectEventHandler<FailedToConnect>((_, update) =>
         {
-            Console.WriteLine(update._message);
+            console.EndSession();
         });
 
         //
         // ConversationSessionStartedUpdate
         //
-        events.ConnectEventHandler<ConversationSessionStartedUpdate>(false, (_, update) =>
+        receiverQueueEvents.ConnectEventHandler<ConversationSessionStartedUpdate>(false, (_, update) =>
         {
             // Notify console output that session has started.
             console.StartSession();
@@ -75,16 +83,16 @@ public partial class Program
         //
         // SendAudioTaskFinished
         //
-        events.ConnectEventHandler<SendAudioTaskFinished>(false, (_, update) =>
+        receiverQueueEvents.ConnectEventHandler<SendAudioTaskFinished>(false, (_, update) =>
         {
-            // Receiver will finish after audio input stream is stopped.
-            updatesReceiver.FinishReceiver();
+            console.WriteWarning("Audio input stream is stopped");
+            console.EndSession();
         });
 
         //
         // ConversationInputSpeechStartedUpdate
         //
-        events.ConnectEventHandler<ConversationInputSpeechStartedUpdate>(false, (_, update) =>
+        receiverQueueEvents.ConnectEventHandler<ConversationInputSpeechStartedUpdate>(false, (_, update) =>
         {
             // Ratio speaker volume while user is speaking.
             speaker.Volume = 0.3f;
@@ -93,7 +101,7 @@ public partial class Program
         //
         // ConversationInputSpeechFinishedUpdate
         //
-        events.ConnectEventHandler<ConversationInputSpeechFinishedUpdate>(false, (_, update) =>
+        receiverQueueEvents.ConnectEventHandler<ConversationInputSpeechFinishedUpdate>(false, (_, update) =>
         {
             speaker.Volume = 1.0f;
         });
@@ -101,7 +109,7 @@ public partial class Program
         //
         // ConversationResponseStartedUpdate
         //
-        events.ConnectEventHandler<ConversationResponseStartedUpdate>(false, (_, update) =>
+        receiverQueueEvents.ConnectEventHandler<ConversationResponseStartedUpdate>(false, (_, update) =>
         {
             speaker.ClearBuffer();
         });
@@ -109,7 +117,7 @@ public partial class Program
         //
         // ConversationResponseFinishedUpdate
         //
-        events.ConnectEventHandler<ConversationResponseFinishedUpdate>(false, (_, update) =>
+        receiverQueueEvents.ConnectEventHandler<ConversationResponseFinishedUpdate>(false, (_, update) =>
         {
             console.SetStateWaitingItem();
         });
@@ -117,7 +125,7 @@ public partial class Program
         //
         // ConversationInputTranscriptionFinishedUpdate
         //
-        events.ConnectEventHandler<ConversationInputTranscriptionFinishedUpdate>(false, (_, update) =>
+        receiverQueueEvents.ConnectEventHandler<ConversationInputTranscriptionFinishedUpdate>(false, (_, update) =>
         {
             console.WriteTranscript(update.Transcript);
         });
@@ -125,7 +133,7 @@ public partial class Program
         //
         // ConversationItemStreamingPartDeltaUpdate
         //
-        events.ConnectEventHandler<ConversationItemStreamingPartDeltaUpdate>(false, (_, update) =>
+        receiverQueueEvents.ConnectEventHandler<ConversationItemStreamingPartDeltaUpdate>(false, (_, update) =>
         {
             if (update.AudioBytes is not null)
             {
@@ -137,26 +145,24 @@ public partial class Program
             }
         });
 
+#if RUN_SYNC
         updatesReceiver.Run();
-        console.EndSession();
-        var taskList = updatesReceiver.GetTaskList();
-#if !DEBUG
-        TaskTool.CancelStopDisposeAll(taskList);
 #else
-        long finishMs = TaskTool.CancelStopDisposeAll(taskList);
-        if (finishMs >= 0)
+        updatesReceiver.RunAsync();
+
+        var awaiter = updatesReceiver.GetAwaiter();
+        if (awaiter is not null)
         {
-            Console.WriteLine($" * Info: It took {finishMs} ms to close session.");
-        }
-        else
-        {
-            Console.WriteLine(" * Error: Failed to finish session. Device tasks still running.");
+            await awaiter;
         }
 #endif
 
         // 'Close' is invoked from 'Dispose' for Stream based classes
         microphone.Dispose();
         speaker.Dispose();
+
+        // Bye, World!
+        console.EndSession();
     }
 
     private static RealtimeConversationClient GetConfiguredClient(ClientApiConfig options)

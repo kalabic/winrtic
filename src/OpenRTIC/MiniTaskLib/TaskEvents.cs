@@ -9,3 +9,8 @@ public class TaskExceptionOccured
         Exception = ex;
     }
 }
+
+public class CloseMessageQueue
+{
+    public CloseMessageQueue() { }
+}
