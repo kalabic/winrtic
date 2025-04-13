@@ -16,8 +16,14 @@ public class MiniConsole
 
     private string _bufferedText = "";
 
-    public MiniConsole()
+    private Func<long> _provideBufferedAudioMs;
+
+    private CancellationToken _cancellationToken;
+
+    public MiniConsole(Func<long> provideBufferedAudioMs, CancellationToken cancellationToken)
     {
+        this._provideBufferedAudioMs = provideBufferedAudioMs;
+        this._cancellationToken = cancellationToken;
         _timer = new();
         _timer.Interval = 500;
         _timer.Elapsed += OnTimedEvent;
@@ -26,9 +32,37 @@ public class MiniConsole
         _timer.Start();
     }
 
+    private bool AssertNotCancelled()
+    {
+        if (_cancellationToken.IsCancellationRequested)
+        {
+            EndSession();
+            return false;
+        }
+        return true;
+    }
+
+    public void UpdateTitleWithBufferedAudioLength(long playbackMs)
+    {
+        var agentText = GetShortTimeString(playbackMs);
+        var titleText = "Audio buffered:[" + agentText + "]";
+        Console.Title = titleText;
+    }
+
+    private string GetShortTimeString(long timeMs)
+    {
+        int playbackMin = (int)(timeMs / (60 * 1000));
+        int playbackSec = (int)((timeMs / 1000) % 60);
+        int playbackDec = (int)((timeMs % 1000) / 100);
+        string mm = playbackMin.ToString("00");
+        string ss = playbackSec.ToString("00");
+        string d = playbackDec.ToString("0");
+        return mm + ":" + ss + "." + d;
+    }
+
     public void Write(string text)
     {
-        if (_sessionStarted)
+        if (AssertNotCancelled() && _sessionStarted)
         {
             if (_receivingItem)
             {
@@ -43,7 +77,7 @@ public class MiniConsole
 
     public void WriteTranscript(string text)
     {
-        if (_sessionStarted)
+        if (AssertNotCancelled() && _sessionStarted)
         {
             if (_receivingItem)
             {
@@ -59,7 +93,8 @@ public class MiniConsole
     {
         _sessionStarted = true;
         Console.WriteLine("");
-        Console.WriteLine(" * Session started (Ctrl-C to finish)");        
+        Console.WriteLine(" * Session started (Ctrl-C to finish)");
+        SetStateWaitingItem();
     }
 
     public void EndSession()
@@ -86,10 +121,10 @@ public class MiniConsole
 
     public void SetStateReceivingItem()
     {
-        if (!_receivingItem)
+        if (AssertNotCancelled() && !_receivingItem)
         {
             _receivingItem = true;
-            _timer.Stop();
+            // _timer.Stop();
             Console.Write(MiniConsolePrompt.AgentPrompt + _bufferedText);
             _bufferedText = "";
         }
@@ -97,7 +132,7 @@ public class MiniConsole
 
     public void SetStateWaitingItem()
     {
-        if (_receivingItem)
+        if (AssertNotCancelled() && _receivingItem)
         {
             _receivingItem = false;
             _timer.Start();
@@ -108,16 +143,20 @@ public class MiniConsole
 
     private void OnTimedEvent(Object? source, System.Timers.ElapsedEventArgs e)
     {
-        if (_sessionStarted)
+        if (AssertNotCancelled())
         {
-            if (!_receivingItem)
+            if (_sessionStarted)
             {
-                Console.Write(MiniConsolePrompt.GetProgressPrompt());
+                if (!_receivingItem)
+                {
+                    Console.Write(MiniConsolePrompt.GetProgressPrompt());
+                }
+                UpdateTitleWithBufferedAudioLength(_provideBufferedAudioMs());
             }
-        }
-        else
-        {
-            Console.Write(". ");
+            else
+            {
+                Console.Write(". ");
+            }
         }
     }
 

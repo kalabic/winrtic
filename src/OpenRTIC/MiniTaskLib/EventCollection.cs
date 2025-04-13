@@ -4,8 +4,7 @@ namespace OpenRTIC.MiniTaskLib;
 
 /// <summary>
 /// All events in collection are defined by C# generics. They need to be enabled first using
-/// <see cref="EnableInvokeFor"/> before <see cref="Invoke"/>
-/// of an event handler will work.
+/// <see cref="EnableInvokeFor"/> before <see cref="Invoke"/> of an event handler will work.
 /// </summary>
 public class EventCollection
 {
@@ -50,7 +49,23 @@ public class EventCollection
 
     public void MakeCompatible(EventCollection other)
     {
-        collection = other.NewCompatibleInstance();
+        foreach (var otherItem in other.collection)
+        {
+            bool exists = false;
+            foreach (var item in collection)
+            {
+                if (item.GetType() == otherItem.GetType())
+                {
+                    exists = true;
+                    break;
+                }
+            }
+
+            if (!exists)
+            {
+                collection.Add(otherItem.NewCompatibleInstance());
+            }
+        }
     }
 
     public bool Exists<TMessage>()
@@ -125,6 +140,11 @@ public class EventCollection
 
     public void ConnectEventHandler<TMessage>(EventHandler<TMessage> eventHandler)
     {
+        ConnectEventHandler(true, eventHandler);
+    }
+
+    public void ConnectEventHandler<TMessage>(bool assertEventExists, EventHandler<TMessage> eventHandler)
+    {
         var items = collection.OfType<EventContainer<TMessage>>();
         if (items.Count() > 1)
         {
@@ -139,7 +159,19 @@ public class EventCollection
         }
         else
         {
-            throw new ArgumentException("Attempted to access non-existent event type in EventSourceCollection.");
+            if (assertEventExists)
+            {
+                throw new ArgumentException("Attempted to access non-existent event type in EventSourceCollection.");
+            }
+            else
+            {
+                EnableInvokeFor<TMessage>();
+                var newItems = collection.OfType<EventContainer<TMessage>>();
+                foreach (var item in items)
+                {
+                    item.ConnectEventHandler(eventHandler);
+                }
+            }
         }
     }
 

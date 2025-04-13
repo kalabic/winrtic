@@ -19,6 +19,10 @@ public abstract class ConversationUpdatesDispatcher : ForwardedEventQueue
     protected ConversationUpdatesDispatcher(CancellationToken? cancellation = null)
         : base(cancellation)
     {
+#if DEBUG
+        SetLabel("Updates Dispatcher");
+#endif
+
         // Adding standard 'EventHandler' for an event from this 'TaskEvents' collection will not
         // automatically invoke them from 'ForwardedEventQueue' task, for that to happen
         // it is necessary to register forwarded event handlers (done in ConversationUpdatesReceiver)
@@ -50,6 +54,33 @@ public abstract class ConversationUpdatesDispatcher : ForwardedEventQueue
         conversationUpdates.EnableInvokeFor<ConversationItemTruncatedUpdate>();
     }
 
+    public void ForwardToOtherUsingQueue(EventCollection other)
+    {
+        other.MakeCompatible(TaskEvents);
+        other.ForwardFromOtherUsingQueue<ConversationSessionStartedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationInputAudioClearedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationInputAudioCommittedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationItemCreatedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationItemDeletedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationErrorUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationInputSpeechStartedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationInputSpeechFinishedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationItemStreamingAudioFinishedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationInputTranscriptionFailedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationInputTranscriptionFinishedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationItemStreamingAudioTranscriptionFinishedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationItemStreamingFinishedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationItemStreamingPartDeltaUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationItemStreamingPartFinishedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationItemStreamingStartedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationItemStreamingTextFinishedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationRateLimitsUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationResponseFinishedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationResponseStartedUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationSessionConfiguredUpdate>(TaskEvents, this);
+        other.ForwardFromOtherUsingQueue<ConversationItemTruncatedUpdate>(TaskEvents, this);
+    }
+
     override protected void Dispose(bool disposing)
     {
         // Release managed resources.
@@ -62,7 +93,7 @@ public abstract class ConversationUpdatesDispatcher : ForwardedEventQueue
         base.Dispose(disposing);
     }
 
-    protected void HandleSessionExceptions(Action sessionFunction)
+    public void HandleSessionExceptions(Action sessionFunction)
     {
         try
         {
@@ -80,7 +111,7 @@ public abstract class ConversationUpdatesDispatcher : ForwardedEventQueue
         }
     }
 
-    protected async Task HandleSessionExceptionsAsync(Func<Task> sessionFunctionAsync)
+    public async Task HandleSessionExceptionsAsync(Func<Task> sessionFunctionAsync)
     {
         try
         {

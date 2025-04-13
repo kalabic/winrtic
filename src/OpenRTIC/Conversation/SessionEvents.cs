@@ -10,6 +10,16 @@ public class ConversationSessionException
     }
 }
 
+public class FailedToConnect
+{
+    public readonly string _message;
+
+    public FailedToConnect(string message) 
+    {
+        this._message = message;
+    }
+}
+
 public class SendAudioTaskFinished
 {
     public SendAudioTaskFinished() { }

@@ -125,7 +125,7 @@ public abstract class TaskWithEvents : TaskBase
     // }
     //
 
-    private void Cancel()
+    public void Cancel()
     {
         if (!IsCancellationRequested())
         {

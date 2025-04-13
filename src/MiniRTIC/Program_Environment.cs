@@ -35,7 +35,7 @@ public partial class Program
             Console.Write("[ Ctrl-C ]");
 #endif
             e.Cancel = true; // Execution continues after the delegate.
-            programCancellationSource.Cancel();
+            programCanceller.Cancel();
         };
         Console.CancelKeyPress += sessionCanceler;
     }

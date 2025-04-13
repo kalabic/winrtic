@@ -1,6 +1,5 @@
 ﻿using OpenAI.RealtimeConversation;
 using System.Net.WebSockets;
-using OpenRTIC.BasicDevices;
 using OpenRTIC.MiniTaskLib;
 
 namespace OpenRTIC.Conversation;
@@ -9,13 +8,6 @@ namespace OpenRTIC.Conversation;
 
 public class ConversationUpdatesReceiver : ConversationUpdatesDispatcher
 {
-    protected const int SAMPLES_PER_SECOND = 24000;
-    protected const int BYTES_PER_SAMPLE = 2;
-    protected const int CHANNELS = 1;
-    protected const int AUDIO_INPUT_BUFFER_SECONDS = 2;
-
-    public static readonly AudioStreamFormat AudioFormat = new(SAMPLES_PER_SECOND, CHANNELS, BYTES_PER_SAMPLE);
-
     public ConversationReceiverState ReceiverState { get { return _sessionState.receiverState; } }
 
     public EventCollection ReceiverEvents { get { return _receiverEvents; } }
@@ -37,30 +29,9 @@ public class ConversationUpdatesReceiver : ConversationUpdatesDispatcher
     {
         this._cancellation = new ConversationCancellation(cancellation);
         this._session = session;
-        EventCollection conversationUpdates = TaskEvents;
-        _receiverEvents.MakeCompatible(conversationUpdates);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationSessionStartedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationInputAudioClearedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationInputAudioCommittedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationItemCreatedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationItemDeletedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationErrorUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationInputSpeechStartedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationInputSpeechFinishedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationItemStreamingAudioFinishedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationInputTranscriptionFailedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationInputTranscriptionFinishedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationItemStreamingAudioTranscriptionFinishedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationItemStreamingFinishedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationItemStreamingPartDeltaUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationItemStreamingPartFinishedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationItemStreamingStartedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationItemStreamingTextFinishedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationRateLimitsUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationResponseFinishedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationResponseStartedUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationSessionConfiguredUpdate>(conversationUpdates, this);
-        _receiverEvents.ForwardFromOtherUsingQueue<ConversationItemTruncatedUpdate>(conversationUpdates, this);
+
+        // Register events collection in this class to be invoked from base receiver's forwarded event queue task.
+        base.ForwardToOtherUsingQueue(_receiverEvents);
 
         // Start 'forwarded event queue'.
         Start();
@@ -137,7 +108,7 @@ public class ConversationUpdatesReceiver : ConversationUpdatesDispatcher
         });
     }
 
-    protected void ReceiveUpdates(CancellationToken cancellation)
+    public void ReceiveUpdates(CancellationToken cancellation)
     {
         HandleSessionExceptionsAsync( async () =>
         {

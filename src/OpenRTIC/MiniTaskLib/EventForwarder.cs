@@ -1,6 +1,4 @@
-﻿using OpenRTIC.BasicDevices;
-
-namespace OpenRTIC.MiniTaskLib;
+﻿namespace OpenRTIC.MiniTaskLib;
 
 // Needed for Collection<EventForwarderBase>, it accepts only non-generic interfaces and classes.
 public class EventForwarderBase { }

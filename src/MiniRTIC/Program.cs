@@ -6,7 +6,6 @@ using System.ClientModel;
 using OpenRTIC.Config;
 using OpenRTIC.Conversation;
 using OpenRTIC.BasicDevices;
-using System.Net.WebSockets;
 using OpenRTIC.MiniTaskLib;
 
 namespace MiniRTIC;
@@ -26,7 +25,7 @@ public partial class Program
     /// <summary>
     /// Connected to <see cref="Console.CancelKeyPress"/> when <see cref="InitializeEnvironment"/> is invoked.
     /// </summary>
-    static private readonly CancellationTokenSource programCancellationSource = new CancellationTokenSource();
+    static private readonly CancellationTokenSource programCanceller = new CancellationTokenSource();
 
     public static void Main(string[] args)
     {
@@ -36,44 +35,16 @@ public partial class Program
         var config = ClientApiConfig.FromEnvironment();
         var client = GetConfiguredClient(config);
 
-        // A small console handling text output in a more friendly way.
-        var console = new MiniConsole();
-
-
-        RealtimeConversationSession? session = null;
-        try
-        {
-            var startCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(programCancellationSource.Token);
-            session = client.StartConversationSession(startCancellationSource.Token);
-            var options = GetDefaultConversationSessionOptions();
-            session.ConfigureSession(options, startCancellationSource.Token);
-        }
-        catch (TaskCanceledException)
-        {
-            Console.WriteLine("Canceled");
-            return;
-        }
-        catch (WebSocketException ex)
-        {
-            Console.WriteLine("Connection failed: " + ex.Message);
-            return;
-        }
-
-        var deviceCancellationSource = new CancellationTokenSource();
-        var deviceCancellation = deviceCancellationSource.Token;
-        var speaker = new SpeakerAudioStream(ConversationUpdatesReceiver.AudioFormat, deviceCancellation);
-        var microphone = new MicrophoneAudioStream(ConversationUpdatesReceiver.AudioFormat, deviceCancellation);
-
-        var updatesReceiver = new ConversationUpdatesReceiverTask(session, microphone, programCancellationSource.Token);
+        //
+        // Create devices, register to be notified about some events and run!
+        //
+        var speaker = new SpeakerAudioStream(ConversationSessionConfig.AudioFormat, programCanceller.Token);
+        var microphone = new MicrophoneAudioStream(ConversationSessionConfig.AudioFormat, programCanceller.Token);
+        var console = new MiniConsole(() => speaker.GetBufferedMs() ,programCanceller.Token); // A small console handling text output in a more friendly way.
+        var updatesReceiver = new ConversationUpdatesReceiverTask(client, microphone, programCanceller.Token);
 
         //
-        // 'Hello' sample that will be enqueued into audio input stream when session starts.
-        // It is a free sample from https://pixabay.com/sound-effects/quothello-therequot-158832/
-        //
-        byte[] helloBuffer = MiniRTIC.Properties.Resources.hello_there;
-
-        //
-        // A collection of events to listen on, invoked from a task that is not used
+        // A collection of events to listen on, will be invoked from a task that is not used
         // for fetching conversation updates.
         //
         var events = updatesReceiver.ReceiverEvents;
@@ -81,15 +52,22 @@ public partial class Program
         //
         // ConversationSessionStartedUpdate
         //
-        events.ConnectEventHandler<ConversationSessionStartedUpdate>((_, update) =>
+        events.ConnectEventHandler<FailedToConnect>((_, update) =>
         {
+            Console.WriteLine(update._message);
+        });
+
+        //
+        // ConversationSessionStartedUpdate
+        //
+        events.ConnectEventHandler<ConversationSessionStartedUpdate>(false, (_, update) =>
+        {
+            // Notify console output that session has started.
             console.StartSession();
-            console.SetStateWaitingItem();
 
-            // Now is a good time to start sending microphone input to the server.
-            updatesReceiver.StartAudioInputTask();
-
-            // Start by queing 'Hello there' sample.
+            // 'Hello there' sample is enqueued into audio input stream when session starts.
+            // It is a free sample from https://pixabay.com/sound-effects/quothello-therequot-158832/
+            byte[] helloBuffer = MiniRTIC.Properties.Resources.hello_there;
             microphone.ClearBuffer();
             microphone.Write(helloBuffer, 0, helloBuffer.Length);
         });
@@ -97,7 +75,7 @@ public partial class Program
         //
         // SendAudioTaskFinished
         //
-        events.ConnectEventHandler<SendAudioTaskFinished>((_, update) =>
+        events.ConnectEventHandler<SendAudioTaskFinished>(false, (_, update) =>
         {
             // Receiver will finish after audio input stream is stopped.
             updatesReceiver.FinishReceiver();
@@ -106,7 +84,7 @@ public partial class Program
         //
         // ConversationInputSpeechStartedUpdate
         //
-        events.ConnectEventHandler<ConversationInputSpeechStartedUpdate>((_, update) =>
+        events.ConnectEventHandler<ConversationInputSpeechStartedUpdate>(false, (_, update) =>
         {
             // Ratio speaker volume while user is speaking.
             speaker.Volume = 0.3f;
@@ -115,7 +93,7 @@ public partial class Program
         //
         // ConversationInputSpeechFinishedUpdate
         //
-        events.ConnectEventHandler<ConversationInputSpeechFinishedUpdate>((_, update) =>
+        events.ConnectEventHandler<ConversationInputSpeechFinishedUpdate>(false, (_, update) =>
         {
             speaker.Volume = 1.0f;
         });
@@ -123,7 +101,7 @@ public partial class Program
         //
         // ConversationResponseStartedUpdate
         //
-        events.ConnectEventHandler<ConversationResponseStartedUpdate>((_, update) =>
+        events.ConnectEventHandler<ConversationResponseStartedUpdate>(false, (_, update) =>
         {
             speaker.ClearBuffer();
         });
@@ -131,7 +109,7 @@ public partial class Program
         //
         // ConversationResponseFinishedUpdate
         //
-        events.ConnectEventHandler<ConversationResponseFinishedUpdate>((_, update) =>
+        events.ConnectEventHandler<ConversationResponseFinishedUpdate>(false, (_, update) =>
         {
             console.SetStateWaitingItem();
         });
@@ -139,7 +117,7 @@ public partial class Program
         //
         // ConversationInputTranscriptionFinishedUpdate
         //
-        events.ConnectEventHandler<ConversationInputTranscriptionFinishedUpdate>((_, update) =>
+        events.ConnectEventHandler<ConversationInputTranscriptionFinishedUpdate>(false, (_, update) =>
         {
             console.WriteTranscript(update.Transcript);
         });
@@ -147,7 +125,7 @@ public partial class Program
         //
         // ConversationItemStreamingPartDeltaUpdate
         //
-        events.ConnectEventHandler<ConversationItemStreamingPartDeltaUpdate>((_, update) =>
+        events.ConnectEventHandler<ConversationItemStreamingPartDeltaUpdate>(false, (_, update) =>
         {
             if (update.AudioBytes is not null)
             {
@@ -160,10 +138,7 @@ public partial class Program
         });
 
         updatesReceiver.Run();
-
         console.EndSession();
-        deviceCancellationSource.Cancel();
-
         var taskList = updatesReceiver.GetTaskList();
 #if !DEBUG
         TaskTool.CancelStopDisposeAll(taskList);
