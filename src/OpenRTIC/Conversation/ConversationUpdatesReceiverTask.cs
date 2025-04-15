@@ -221,7 +221,7 @@ public class ConversationUpdatesReceiverTask : IDisposable
             // When OpenAI.RealtimeConversation client gives up, it will throw here.
             //
             session?.Dispose();
-            _receiver.FailedToConnect(ex.Message);
+            _receiver.FailedToConnect(TaskTool.BuildMultiLineExceptionErrorString(ex));
             return;
         }
         finally

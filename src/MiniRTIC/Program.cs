@@ -62,6 +62,7 @@ public partial class Program
         //
         receiverEvents.ConnectEventHandler<FailedToConnect>((_, update) =>
         {
+            console.WriteError(update._message);
             console.EndSession();
         });
 

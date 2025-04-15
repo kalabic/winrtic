@@ -41,4 +41,18 @@ public class TaskTool
 
         return 0;
     }
+
+    static public string BuildMultiLineExceptionErrorString(Exception ex)
+    {
+        string result = "";
+        for (var e = ex; e != null; e = e.InnerException)
+        {
+            if (result.Length > 0)
+            {
+                result += "\n";
+            }
+            result += ("Error: " + e.Message);
+        }
+        return result;
+    }
 }

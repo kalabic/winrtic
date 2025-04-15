@@ -89,6 +89,14 @@ public class MiniConsole
         }
     }
 
+    public void WriteError(string text)
+    {
+        if (AssertNotCancelled())
+        {
+            Console.WriteLine("\n\n" + text);
+        }
+    }
+
     public void WriteWarning(string text)
     {
         if (AssertNotCancelled())
