@@ -109,7 +109,9 @@ public class MiniConsole
     {
         _sessionStarted = true;
         Console.WriteLine("");
+        Console.WriteLine(" *");
         Console.WriteLine(" * Session started (Ctrl-C to finish)");
+        Console.WriteLine(" *");
         SetStateWaitingItem();
     }
 
@@ -126,7 +128,7 @@ public class MiniConsole
                 Console.WriteLine("");
             }
 
-            Console.WriteLine("SESSION ENDED");
+            Console.Write("     \nSESSION ENDED\n\n");
         }
         _timer.Stop();
     }
@@ -136,7 +138,7 @@ public class MiniConsole
         if (AssertNotCancelled() && !_receivingItem)
         {
             _receivingItem = true;
-            // _timer.Stop();
+            _timer.Stop();
             Console.Write(MiniConsolePrompt.AgentPrompt + _bufferedText);
             _bufferedText = "";
         }

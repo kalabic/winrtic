@@ -212,7 +212,7 @@ public class ConversationUpdatesReceiverTask : IDisposable
             // Cancellation by watchdog will throw here.
             //
             session?.Dispose();
-            _receiver.FailedToConnect(ex.Message);
+            _receiver.FailedToConnect("Error: Network timeout. No connection or server not responding.");
             return;
         }
         catch (WebSocketException ex)
