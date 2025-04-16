@@ -16,11 +16,11 @@ public class RTIState_WritingItem : RTIStateWithTimer
     public void WriteItemId(string itemId)
     {
         // Console.WriteLine("Item Id: " + itemId);
-        Console.WriteLine("------------------------");
     }
 
     override public void Enter()
     {
+        Console.WriteLine("[---- " + DateTime.Now.ToLongTimeString() + " ---- " + DateTime.Now.ToShortDateString() + " ----]\n");
         _timer.Start();
         _waitingTranscript = true;
     }
@@ -97,7 +97,7 @@ public class RTIState_WritingItem : RTIStateWithTimer
             }
             else
             {
-                Console.WriteLine("\nUNEXPECTED TRANSCRIPT UPDATE:");
+                Console.WriteLine("\n[UNEXPECTED TRANSCRIPT UPDATE]\n");
                 Console.WriteLine("  USER: " + message);
                 Console.Write(" AGENT: ");
             }
