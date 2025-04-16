@@ -33,7 +33,7 @@ public class RTIState_Inactive : IRTIState
 #endif
     }
 
-    public void WriteLine(RTIOut type, string message)
+    public void WriteLine(RTIOut type, string? message)
     {
         if (type == RTIOut.System)
         {
@@ -47,7 +47,7 @@ public class RTIState_Inactive : IRTIState
 #endif
     }
 
-    public void WriteLine(string message)
+    public void WriteLine(string? message)
     {
         WriteLine(RTIOut.System, message);
     }

@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MiniRTIC", "src\MiniRTIC\Mi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRTIC", "src\OpenRTIC\OpenRTIC.csproj", "{085AF914-96BF-2422-F3EC-BB614A5EA08F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinRTIC", "src\WinRTIC\WinRTIC.csproj", "{A18AAB38-CE9F-0075-56C0-CBB2E948FE54}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{085AF914-96BF-2422-F3EC-BB614A5EA08F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{085AF914-96BF-2422-F3EC-BB614A5EA08F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{085AF914-96BF-2422-F3EC-BB614A5EA08F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A18AAB38-CE9F-0075-56C0-CBB2E948FE54}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A18AAB38-CE9F-0075-56C0-CBB2E948FE54}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A18AAB38-CE9F-0075-56C0-CBB2E948FE54}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A18AAB38-CE9F-0075-56C0-CBB2E948FE54}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

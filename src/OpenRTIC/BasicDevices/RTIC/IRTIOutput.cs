@@ -7,7 +7,7 @@ public interface IRTIOutput
 {
     public void Write(RTIOut type, string message);
 
-    public void WriteLine(RTIOut type, string message);
+    public void WriteLine(RTIOut type, string? message);
 
-    public void WriteLine(string message);
+    public void WriteLine(string? message);
 }

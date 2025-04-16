@@ -35,7 +35,7 @@ public abstract class RTIStateWithTimer : IRTIState
 
     public abstract void Write(RTIOut type, string message);
 
-    public abstract void WriteLine(RTIOut type, string message);
+    public abstract void WriteLine(RTIOut type, string? message);
 
-    public abstract void WriteLine(string message);
+    public abstract void WriteLine(string? message);
 }

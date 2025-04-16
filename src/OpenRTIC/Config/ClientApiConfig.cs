@@ -8,6 +8,14 @@ public enum EndpointType
     OpenAIWithKey,
 }
 
+public enum ConfigSource
+{
+    None,
+    ApiOptionsFromEnvironment,
+    ApiOptionsFromFile,
+    ApiOptionsFromOther
+}
+
 public class ClientApiConfig
 {
     static public ClientApiConfig FromEnvironment()
@@ -17,6 +25,10 @@ public class ClientApiConfig
         return config;
     }
 
+
+    public ConfigSource Source { get { return _configSource; } }
+
+    public string ConfigFile { get { return _configSourceFile; } }
 
     public EndpointType Type { get { return _type; } }
 
@@ -33,6 +45,9 @@ public class ClientApiConfig
     protected string? _aoaiDeployment;
     protected string? _aoaiApiKey;
     protected string? _oaiApiKey;
+
+    protected ConfigSource _configSource = ConfigSource.None;
+    protected string _configSourceFile = "";
     protected EndpointType _type = EndpointType.IncompleteOptions;
 
     public EndpointType fromEnvironment()
@@ -43,11 +58,14 @@ public class ClientApiConfig
         _aoaiDeployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
         _aoaiApiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
         _oaiApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        return updateType();
+        return updateType(ConfigSource.ApiOptionsFromEnvironment);
     }
 
-    protected EndpointType updateType()
+    protected EndpointType updateType(ConfigSource configSource, string configFile = "")
     {
+        _configSource = configSource;
+        _configSourceFile = configFile;
+
         if (!String.IsNullOrEmpty(_aoaiEndpoint) && _aoaiUseEntra)
         {
             _type = EndpointType.AzureOpenAIWithEntra;

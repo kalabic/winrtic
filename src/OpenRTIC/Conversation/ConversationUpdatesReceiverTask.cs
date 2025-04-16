@@ -206,19 +206,33 @@ public class ConversationUpdatesReceiverTask : IDisposable
             var options = ConversationSessionConfig.GetDefaultConversationSessionOptions();
             session.ConfigureSession(options, startCanceller.Token);
         }
-        catch (TaskCanceledException)
+        catch (TaskCanceledException ex)
         {
-            //
-            // Cancellation by watchdog will throw here.
-            //
+            if (!startCanceller.IsCancellationRequested)
+            {
+                // 'startWatchdog' did not trigger cancellation, so reason for exception
+                // cannot be clearly known.
+                _receiver.FailedToConnect("Info: Connection canceled for unknown reason.");
+                _receiver.FailedToConnect(TaskTool.BuildMultiLineExceptionErrorString(ex));
+            }
+            else if (receiverTaskCancellation.IsCancellationRequested || _cancellation.IsCancellationRequested)
+            {
+                // Cancellation because some of wait handles observed by 'startWatchdog' were triggered.
+                _receiver.FailedToConnect("Info: Connection canceled.");
+            }
+            else
+            {
+                // Cancellation because 'START_TASK_TIMEOUT' used by 'startWatchdog' was triggered.
+                _receiver.FailedToConnect("Info: Connection canceled because server did not respond in time.");
+            }
+
             session?.Dispose();
-            _receiver.FailedToConnect("Error: Network timeout. No connection or server not responding.");
             return;
         }
         catch (WebSocketException ex)
         {
             //
-            // When OpenAI.RealtimeConversation client gives up, it will throw here.
+            // When OpenAI.RealtimeConversation _client gives up, it will throw here.
             //
             session?.Dispose();
             _receiver.FailedToConnect(TaskTool.BuildMultiLineExceptionErrorString(ex));
@@ -370,7 +384,7 @@ public class ConversationUpdatesReceiverTask : IDisposable
         }
         else
         {
-            DeviceNotifications.Error("Failed to finish session. Device tasks still running.");
+            DeviceNotifications.Error("Failed to finish session. Some conversation receiver tasks still running.");
         }
 #endif
     }

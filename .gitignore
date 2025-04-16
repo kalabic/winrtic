@@ -3,3 +3,5 @@ src/MiniRTIC/bin/
 src/MiniRTIC/obj/
 src/OpenRTIC/bin/
 src/OpenRTIC/obj/
+src/WinRTIC/bin/
+src/WinRTIC/obj/

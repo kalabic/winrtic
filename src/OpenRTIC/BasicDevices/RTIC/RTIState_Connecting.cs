@@ -54,7 +54,7 @@ public class RTIState_Connecting : RTIStateWithTimer
         throw new NotImplementedException();
     }
 
-    override public void WriteLine(RTIOut type, string message)
+    override public void WriteLine(RTIOut type, string? message)
     {
         if (type == RTIOut.System)
         {
@@ -69,7 +69,7 @@ public class RTIState_Connecting : RTIStateWithTimer
 #endif
     }
 
-    override public void WriteLine(string message)
+    override public void WriteLine(string? message)
     {
         WriteLine(RTIOut.System, message);
     }

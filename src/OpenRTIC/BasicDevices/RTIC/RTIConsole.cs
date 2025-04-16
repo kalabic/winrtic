@@ -94,7 +94,7 @@ public class RTIConsole
         }
     }
 
-    public void WriteLine(RTIOut type, string message)
+    public void WriteLine(RTIOut type, string? message)
     {
         lock (_locker)
         {
@@ -102,7 +102,7 @@ public class RTIConsole
         }
     }
 
-    public void WriteLine(string message)
+    public void WriteLine(string? message)
     {
         lock (_locker)
         {

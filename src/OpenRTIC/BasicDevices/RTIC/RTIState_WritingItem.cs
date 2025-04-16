@@ -20,7 +20,10 @@ public class RTIState_WritingItem : RTIStateWithTimer
 
     override public void Enter()
     {
-        Console.WriteLine("[---- " + DateTime.Now.ToLongTimeString() + " ---- " + DateTime.Now.ToShortDateString() + " ----]\n");
+        string itemHeader = "[---- " + DateTime.Now.ToLongTimeString() + " ---- " + DateTime.Now.ToShortDateString() + " ----]\n";
+        // Align text right.
+        Console.CursorLeft = Console.BufferWidth - itemHeader.Length - 5;
+        Console.WriteLine(itemHeader);
         _timer.Start();
         _waitingTranscript = true;
     }
@@ -82,7 +85,7 @@ public class RTIState_WritingItem : RTIStateWithTimer
         }
     }
 
-    override public void WriteLine(RTIOut type, string message)
+    override public void WriteLine(RTIOut type, string? message)
     {
         if (type == RTIOut.User)
         {
@@ -91,14 +94,14 @@ public class RTIState_WritingItem : RTIStateWithTimer
                 Console.Write("\r      \r");
                 _timer.Stop();
                 _waitingTranscript = false;
-                Console.WriteLine("  USER: " + message);
+                Console.WriteLine("  USER: " + ((message is not null) ? message : ""));
                 Console.Write(" AGENT: " + _agentBuffer);
                 _agentBuffer = "";
             }
             else
             {
                 Console.WriteLine("\n[UNEXPECTED TRANSCRIPT UPDATE]\n");
-                Console.WriteLine("  USER: " + message);
+                Console.WriteLine("  USER: " + ((message is not null) ? message : ""));
                 Console.Write(" AGENT: ");
             }
         }
@@ -123,7 +126,7 @@ public class RTIState_WritingItem : RTIStateWithTimer
 #endif
     }
 
-    override public void WriteLine(string message)
+    override public void WriteLine(string? message)
     {
         WriteLine(RTIOut.System, message);
     }
