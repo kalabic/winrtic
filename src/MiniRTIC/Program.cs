@@ -62,7 +62,7 @@ public partial class Program
         //
         // FailedToConnect
         //
-        receiverEvents.ConnectEventHandler<FailedToConnect>((_, update) =>
+        receiverEvents.Connect<FailedToConnect>((_, update) =>
         {
             RTIConsole.ConnectingFailed(update._message);
         });
@@ -70,7 +70,7 @@ public partial class Program
         //
         // ConversationSessionStartedUpdate
         //
-        receiverQueueEvents.ConnectEventHandler<ConversationSessionStartedUpdate>(false, (_, update) =>
+        receiverQueueEvents.Connect<ConversationSessionStartedUpdate>(false, (_, update) =>
         {
             // Notify console output that session has started.
             RTIConsole.SessionStarted(" *\n * Session started (Ctrl-C to finish)\n *");
@@ -85,7 +85,7 @@ public partial class Program
         //
         // SendAudioTaskFinished
         //
-        receiverQueueEvents.ConnectEventHandler<SendAudioTaskFinished>(false, (_, update) =>
+        receiverQueueEvents.Connect<SendAudioTaskFinished>(false, (_, update) =>
         {
             RTIConsole.SessionFinished("Audio input stream is stopped\nSESSION FINISHED");
         });
@@ -93,7 +93,7 @@ public partial class Program
         //
         // ConversationInputSpeechStartedUpdate
         //
-        receiverQueueEvents.ConnectEventHandler<ConversationInputSpeechStartedUpdate>(false, (_, update) =>
+        receiverQueueEvents.Connect<ConversationInputSpeechStartedUpdate>(false, (_, update) =>
         {
             // Ratio speaker volume while user is speaking.
             speaker.Volume = 0.3f;
@@ -102,7 +102,7 @@ public partial class Program
         //
         // ConversationInputSpeechFinishedUpdate
         //
-        receiverQueueEvents.ConnectEventHandler<ConversationInputSpeechFinishedUpdate>(false, (_, update) =>
+        receiverQueueEvents.Connect<ConversationInputSpeechFinishedUpdate>(false, (_, update) =>
         {
             speaker.Volume = 1.0f;
         });
@@ -110,7 +110,7 @@ public partial class Program
         //
         // ConversationResponseStartedUpdate
         //
-        receiverQueueEvents.ConnectEventHandler<ConversationResponseStartedUpdate>(false, (_, update) =>
+        receiverQueueEvents.Connect<ConversationResponseStartedUpdate>(false, (_, update) =>
         {
             speaker.ClearBuffer();
             RTIConsole.ItemStarted(update.EventId);
@@ -119,7 +119,7 @@ public partial class Program
         //
         // ConversationResponseFinishedUpdate
         //
-        receiverQueueEvents.ConnectEventHandler<ConversationResponseFinishedUpdate>(false, (_, update) =>
+        receiverQueueEvents.Connect<ConversationResponseFinishedUpdate>(false, (_, update) =>
         {
             RTIConsole.ItemFinished();
         });
@@ -127,7 +127,7 @@ public partial class Program
         //
         // ConversationInputTranscriptionFinishedUpdate
         //
-        receiverQueueEvents.ConnectEventHandler<ConversationInputTranscriptionFinishedUpdate>(false, (_, update) =>
+        receiverQueueEvents.Connect<ConversationInputTranscriptionFinishedUpdate>(false, (_, update) =>
         {
             if (!String.IsNullOrEmpty(update.Transcript))
             {
@@ -138,7 +138,7 @@ public partial class Program
         //
         // ConversationInputTranscriptionFailedUpdate
         //
-        receiverQueueEvents.ConnectEventHandler<ConversationInputTranscriptionFailedUpdate>(false, (_, update) =>
+        receiverQueueEvents.Connect<ConversationInputTranscriptionFailedUpdate>(false, (_, update) =>
         {
             if (!String.IsNullOrEmpty(update.ErrorMessage))
             {
@@ -149,7 +149,7 @@ public partial class Program
         //
         // ConversationItemStreamingPartDeltaUpdate
         //
-        receiverQueueEvents.ConnectEventHandler<ConversationItemStreamingPartDeltaUpdate>(false, (_, update) =>
+        receiverQueueEvents.Connect<ConversationItemStreamingPartDeltaUpdate>(false, (_, update) =>
         {
             if (update.AudioBytes is not null)
             {

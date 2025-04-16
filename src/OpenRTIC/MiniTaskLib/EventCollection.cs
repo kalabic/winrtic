@@ -18,7 +18,7 @@ public class EventCollection
     }
 
     /// <summary>
-    /// For 'Invoke' and 'ConnectEventHandler' to work for specific type of object (TMessage), it is first necessary to enable them.
+    /// For 'Invoke' and 'Connect' to work for specific type of object (TMessage), it is first necessary to enable them.
     /// </summary>
     /// <typeparam name="TMessage"></typeparam>
     /// <exception cref="ArgumentException"></exception>
@@ -119,7 +119,7 @@ public class EventCollection
 
     public void ForwardFromOtherUsingQueue<TMessage>(EventCollection other, IQueueWriter<IInvokeForwardedEvent> destinationQueue)
     {
-        other.ConnectEventForwarder<TMessage>(GetEventForwarder<TMessage>(destinationQueue));
+        other.Connect<TMessage>(GetEventForwarder<TMessage>(destinationQueue));
     }
 
     public void AddEventAndForwardFromOtherUsingQueue<TMessage>(EventCollection other, IQueueWriter<IInvokeForwardedEvent> destinationQueue)
@@ -135,15 +135,15 @@ public class EventCollection
         }
 
         EnableInvokeFor<TMessage>();
-        other.ConnectEventForwarder<TMessage>(GetEventForwarder<TMessage>(destinationQueue));
+        other.Connect<TMessage>(GetEventForwarder<TMessage>(destinationQueue));
     }
 
-    public void ConnectEventHandler<TMessage>(EventHandler<TMessage> eventHandler)
+    public void Connect<TMessage>(EventHandler<TMessage> eventHandler)
     {
-        ConnectEventHandler(true, eventHandler);
+        Connect(true, eventHandler);
     }
 
-    public void ConnectEventHandler<TMessage>(bool assertEventExists, EventHandler<TMessage> eventHandler)
+    public void Connect<TMessage>(bool assertEventExists, EventHandler<TMessage> eventHandler)
     {
         var items = collection.OfType<EventContainer<TMessage>>();
         if (items.Count() > 1)
@@ -175,12 +175,12 @@ public class EventCollection
         }
     }
 
-    public void ConnectEventHandlerAsync<TMessage>(EventHandler<TMessage> eventHandler)
+    public void ConnectAsync<TMessage>(EventHandler<TMessage> eventHandler)
     {
-        ConnectEventHandlerAsync(true, eventHandler);
+        ConnectAsync(true, eventHandler);
     }
 
-    public void ConnectEventHandlerAsync<TMessage>(bool assertEventExists, EventHandler<TMessage> eventHandler)
+    public void ConnectAsync<TMessage>(bool assertEventExists, EventHandler<TMessage> eventHandler)
     {
         var asyncEventHandler = new EventHandler<TMessage>(
             (sender, message) => Task.Run(() => eventHandler.Invoke(sender, message)));
@@ -215,7 +215,7 @@ public class EventCollection
         }
     }
 
-    public void ConnectEventForwarder<TMessage>(EventForwarder<TMessage> forwarder)
+    public void Connect<TMessage>(EventForwarder<TMessage> forwarder)
     {
         var items = collection.OfType<EventContainer<TMessage>>();
         if (items.Count() > 1)

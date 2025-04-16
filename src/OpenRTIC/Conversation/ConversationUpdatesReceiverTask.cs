@@ -58,10 +58,10 @@ public class ConversationUpdatesReceiverTask : IDisposable
         _receiverQueueEvents.EnableInvokeFor<InputAudioTaskFinished>();
         _receiverQueueEvents.EnableInvokeFor<FailedToConnect>();
 
-        _receiver.ReceiverEvents.ConnectEventForwarder(
+        _receiver.ReceiverEvents.Connect(
             _receiver.NewQueuedEventForwarder<InputAudioTaskFinished>( (_, _) => HandleEvent_InputAudioTaskFinished() ));
 
-        _receiver.ReceiverEvents.ConnectEventForwarder(
+        _receiver.ReceiverEvents.Connect(
             _receiver.NewQueuedEventForwarder<FailedToConnect>((_, _) => HandleEvent_FailedToConnect() ));
     }
 
@@ -92,7 +92,7 @@ public class ConversationUpdatesReceiverTask : IDisposable
         var actionAwaiter = _receiver.GetAwaiter();
         if (actionAwaiter is not null)
         {
-            actionAwaiter.TaskEvents.ConnectEventHandler<TaskStateUpdate>( (_, update) => AssertAllTasksComplete(update) );
+            actionAwaiter.TaskEvents.Connect<TaskStateUpdate>( (_, update) => AssertAllTasksComplete(update) );
         }
     }
 
@@ -241,7 +241,7 @@ public class ConversationUpdatesReceiverTask : IDisposable
         _receiver.ForwardToOtherUsingQueue(_receiverQueueEvents);
 
         // 'Session Started Update' event is a good time to start sending microphone input to the server.
-        _receiverQueueEvents.ConnectEventHandler<ConversationSessionStartedUpdate>((_, _) => StartAudioInputTask());
+        _receiverQueueEvents.Connect<ConversationSessionStartedUpdate>((_, _) => StartAudioInputTask());
 
         _receiver.ReceiveUpdates(receiverTaskCancellation);
     }

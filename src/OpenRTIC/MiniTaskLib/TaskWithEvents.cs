@@ -72,7 +72,7 @@ public abstract class TaskWithEvents : TaskBase
 
     public void StartAndFinishWithAction(Action finishAction)
     {
-        _taskEvents.ConnectEventHandler<TaskStateUpdate>((_, update) =>
+        _taskEvents.Connect<TaskStateUpdate>((_, update) =>
         {
             if (update == TaskStateUpdate.Finished)
             {

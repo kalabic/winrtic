@@ -24,7 +24,7 @@ public class ForwardedEventQueue : MessageQueueFunction<IInvokeForwardedEvent>
 
         // TODO: Add an API for following steps:
         _events.EnableInvokeFor<CloseMessageQueue>();
-        _events.ConnectEventForwarder(
+        _events.Connect(
             NewQueuedEventForwarder<CloseMessageQueue>(
                 (_, update) => TryWriteFinalMessage(
                     new FinalMessage( 
