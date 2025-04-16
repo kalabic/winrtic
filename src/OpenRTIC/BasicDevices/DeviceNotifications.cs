@@ -2,33 +2,35 @@
 
 public class DeviceNotifications
 {
+    static public IDeviceNotificationWriter? writer = null;
+
     static public void ExceptionOccured(Exception ex)
     {
-        Console.WriteLine(" >>> Exception occured: " + ex.GetType().ToString() + "; Message: " + ex.Message);
+        writer?.WriteNotification(" >>> Exception occured: " + ex.GetType().ToString() + "; Message: " + ex.Message);
     }
 
     static public void ObjectDisposed(string label)
     {
-        Console.WriteLine(" >>> Disposed: " + label);
+        writer?.WriteNotification(" >>> Disposed: " + label);
     }
 
     static public void ObjectDisposed(object obj)
     {
-        Console.WriteLine(" >>> Disposed: " + obj.GetType().ToString());
+        writer?.WriteNotification(" >>> Disposed: " + obj.GetType().ToString());
     }
 
     static public void TaskFinished(string label, object obj)
     {
-        Console.WriteLine(" >>> Task finished: '" + label + "' " + obj.GetType().ToString());
+        writer?.WriteNotification(" >>> Task finished: '" + label + "' " + obj.GetType().ToString());
     }
 
     static public void Error(string errorMessage)
     {
-        Console.WriteLine(" >>> Error: " + errorMessage);
+        writer?.WriteNotification(" >>> Error: " + errorMessage);
     }
 
     static public void Info(string infoMessage)
     {
-        Console.WriteLine(" >>> Info: " + infoMessage);
+        writer?.WriteNotification(" >>> Info: " + infoMessage);
     }
 }

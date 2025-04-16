@@ -206,7 +206,7 @@ public class ConversationUpdatesReceiverTask : IDisposable
             var options = ConversationSessionConfig.GetDefaultConversationSessionOptions();
             session.ConfigureSession(options, startCanceller.Token);
         }
-        catch (TaskCanceledException ex)
+        catch (TaskCanceledException)
         {
             //
             // Cancellation by watchdog will throw here.
@@ -230,7 +230,7 @@ public class ConversationUpdatesReceiverTask : IDisposable
 #if DEBUG_VERBOSE
             startStopwatch.Stop();
             startTimeMs = startStopwatch.ElapsedMilliseconds;
-            Console.WriteLine($" >>> Start Stopwatch: {startTimeMs}");
+            DeviceNotifications.Info($" Start Stopwatch: {startTimeMs}");
 #endif
         }
 

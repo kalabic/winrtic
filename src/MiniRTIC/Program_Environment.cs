@@ -1,9 +1,13 @@
-﻿using System.Text;
+﻿using OpenRTIC.BasicDevices;
+using OpenRTIC.BasicDevices.RTIC;
+using System.Text;
 
 namespace MiniRTIC;
 
 public partial class Program
 {
+    static private RTIConsole RTIConsole = new();
+
     static private int ctrlcWatchdog = 0;
 
     static private void InitializeEnvironment()
@@ -32,5 +36,7 @@ public partial class Program
             }
         };
         Console.CancelKeyPress += sessionCanceler;
+
+        DeviceNotifications.writer = RTIConsole;
     }
 }

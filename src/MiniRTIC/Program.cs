@@ -8,6 +8,7 @@ using System.ClientModel;
 using OpenRTIC.Config;
 using OpenRTIC.Conversation;
 using OpenRTIC.BasicDevices;
+using OpenRTIC.BasicDevices.RTIC;
 
 namespace MiniRTIC;
 
@@ -39,15 +40,16 @@ public partial class Program
         // Set UTF-8, handle Ctrl-C, etc.
         InitializeEnvironment();
 
+        // OpenAI.RealtimeConversation client with basically default options.
         var config = ClientApiConfig.FromEnvironment();
         var client = GetConfiguredClient(config);
 
         //
         // Create devices, register to be notified about some receiverQueueEvents and run!
         //
+
         var speaker = new SpeakerAudioStream(ConversationSessionConfig.AudioFormat, GetCancellationToken());
         var microphone = new MicrophoneAudioStream(ConversationSessionConfig.AudioFormat, GetCancellationToken());
-        var console = new MiniConsole(() => speaker.GetBufferedMs() , GetCancellationToken()); // A small console handling text output in a more friendly way.
         var updatesReceiver = new ConversationUpdatesReceiverTask(client, microphone, GetCancellationToken());
 
         //
@@ -62,8 +64,7 @@ public partial class Program
         //
         receiverEvents.ConnectEventHandler<FailedToConnect>((_, update) =>
         {
-            console.WriteError(update._message);
-            console.EndSession();
+            RTIConsole.ConnectingFailed(update._message);
         });
 
         //
@@ -72,7 +73,7 @@ public partial class Program
         receiverQueueEvents.ConnectEventHandler<ConversationSessionStartedUpdate>(false, (_, update) =>
         {
             // Notify console output that session has started.
-            console.StartSession();
+            RTIConsole.SessionStarted(" *\n * Session started (Ctrl-C to finish)\n *");
 
             // 'Hello there' sample is enqueued into audio input stream when session starts.
             // It is a free sample from https://pixabay.com/sound-effects/quothello-therequot-158832/
@@ -86,8 +87,7 @@ public partial class Program
         //
         receiverQueueEvents.ConnectEventHandler<SendAudioTaskFinished>(false, (_, update) =>
         {
-            console.WriteWarning("Audio input stream is stopped");
-            console.EndSession();
+            RTIConsole.SessionFinished("Audio input stream is stopped\nSESSION FINISHED");
         });
 
         //
@@ -113,6 +113,7 @@ public partial class Program
         receiverQueueEvents.ConnectEventHandler<ConversationResponseStartedUpdate>(false, (_, update) =>
         {
             speaker.ClearBuffer();
+            RTIConsole.ItemStarted(update.EventId);
         });
 
         //
@@ -120,7 +121,7 @@ public partial class Program
         //
         receiverQueueEvents.ConnectEventHandler<ConversationResponseFinishedUpdate>(false, (_, update) =>
         {
-            console.SetStateWaitingItem();
+            RTIConsole.ItemFinished();
         });
 
         //
@@ -128,7 +129,21 @@ public partial class Program
         //
         receiverQueueEvents.ConnectEventHandler<ConversationInputTranscriptionFinishedUpdate>(false, (_, update) =>
         {
-            console.WriteTranscript(update.Transcript);
+            if (!String.IsNullOrEmpty(update.Transcript))
+            {
+                RTIConsole.WriteLine(RTIOut.User, update.Transcript);
+            }
+        });
+
+        //
+        // ConversationInputTranscriptionFailedUpdate
+        //
+        receiverQueueEvents.ConnectEventHandler<ConversationInputTranscriptionFailedUpdate>(false, (_, update) =>
+        {
+            if (!String.IsNullOrEmpty(update.ErrorMessage))
+            {
+                RTIConsole.WriteLine(RTIOut.User, update.ErrorMessage);
+            }
         });
 
         //
@@ -142,11 +157,16 @@ public partial class Program
             }
             if (!String.IsNullOrEmpty(update.AudioTranscript))
             {
-                console.Write(update.AudioTranscript);
+                RTIConsole.Write(RTIOut.Agent, update.AudioTranscript);
+            }
+            if (!String.IsNullOrEmpty(update.Text))
+            {
+                throw new NotImplementedException();
             }
         });
 
 #if RUN_SYNC
+        RTIConsole.ConnectingStarted();
         updatesReceiver.Run();
 #else
         updatesReceiver.RunAsync();
@@ -161,9 +181,6 @@ public partial class Program
         // 'Close' is invoked from 'Dispose' for Stream based classes
         microphone.Dispose();
         speaker.Dispose();
-
-        // Bye, World!
-        console.EndSession();
     }
 
     private static RealtimeConversationClient GetConfiguredClient(ClientApiConfig options)
@@ -190,9 +207,9 @@ public partial class Program
         string aoaiEndpoint,
         string? aoaiDeployment)
     {
-        Console.WriteLine($" * Connecting to Azure OpenAI endpoint (AZURE_OPENAI_ENDPOINT): {aoaiEndpoint}");
-        Console.WriteLine($" * Using Entra token-based authentication (AZURE_OPENAI_USE_ENTRA)");
-        Console.WriteLine(string.IsNullOrEmpty(aoaiDeployment)
+        RTIConsole.WriteLine($" * Connecting to Azure OpenAI endpoint (AZURE_OPENAI_ENDPOINT): {aoaiEndpoint}");
+        RTIConsole.WriteLine($" * Using Entra token-based authentication (AZURE_OPENAI_USE_ENTRA)");
+        RTIConsole.WriteLine(string.IsNullOrEmpty(aoaiDeployment)
             ? $" * Using no deployment (AZURE_OPENAI_DEPLOYMENT)"
             : $" * Using deployment (AZURE_OPENAI_DEPLOYMENT): {aoaiDeployment}");
 
@@ -205,9 +222,9 @@ public partial class Program
         string? aoaiDeployment,
         string aoaiApiKey)
     {
-        Console.WriteLine($" * Connecting to Azure OpenAI endpoint (AZURE_OPENAI_ENDPOINT): {aoaiEndpoint}");
-        Console.WriteLine($" * Using API key (AZURE_OPENAI_API_KEY): {aoaiApiKey[..5]}**");
-        Console.WriteLine(string.IsNullOrEmpty(aoaiDeployment)
+        RTIConsole.WriteLine($" * Connecting to Azure OpenAI endpoint (AZURE_OPENAI_ENDPOINT): {aoaiEndpoint}");
+        RTIConsole.WriteLine($" * Using API key (AZURE_OPENAI_API_KEY): {aoaiApiKey[..5]}**");
+        RTIConsole.WriteLine(string.IsNullOrEmpty(aoaiDeployment)
             ? $" * Using no deployment (AZURE_OPENAI_DEPLOYMENT)"
             : $" * Using deployment (AZURE_OPENAI_DEPLOYMENT): {aoaiDeployment}");
 
@@ -218,8 +235,8 @@ public partial class Program
     private static RealtimeConversationClient GetConfiguredClientForOpenAIWithKey(string oaiApiKey)
     {
         string oaiEndpoint = "https://api.openai.com/v1";
-        Console.WriteLine($" * Connecting to OpenAI endpoint (OPENAI_ENDPOINT): {oaiEndpoint}");
-        Console.WriteLine($" * Using API key (OPENAI_API_KEY): {oaiApiKey[..5]}**");
+        RTIConsole.WriteLine($" * Connecting to OpenAI endpoint (OPENAI_ENDPOINT): {oaiEndpoint}");
+        RTIConsole.WriteLine($" * Using API key (OPENAI_API_KEY): {oaiApiKey[..5]}**");
 
         OpenAIClient aoaiClient = new(new ApiKeyCredential(oaiApiKey));
         return aoaiClient.GetRealtimeConversationClient("gpt-4o-realtime-preview-2024-10-01");

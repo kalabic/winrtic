@@ -111,7 +111,7 @@ public abstract class TaskWithEvents : TaskBase
 #if DEBUG
         stopTask.SetLabel("Stop Task For [" + _label + "]");
 #if DEBUG_VERBOSE
-        Console.WriteLine("Task created: " + stopTask._label);
+        DeviceNotifications.Info("Task created: " + stopTask._label);
 #endif
 #endif
         stopTask.Start();
@@ -163,10 +163,5 @@ public abstract class TaskWithEvents : TaskBase
     virtual protected void NotifyExceptionOccurred(Exception ex)
     {
         _taskEvents.Invoke(new TaskExceptionOccured(ex));
-    }
-
-    virtual protected void NotifyEventOccurred(EventArgs ev)
-    {
-        Console.WriteLine(" * Event occurred" + ev.ToString());
     }
 }
