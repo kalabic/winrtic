@@ -8,11 +8,11 @@ namespace OpenRTIC.Conversation.Devices;
 
 public class SessionConsole
 {
-    private RTIConsole _console;
+    private IRTIConsole _console;
 
     public const int DEFAULT_CONSOLE_BUFFER_SIZE = 1024;
 
-    public SessionConsole(RTIConsole console)
+    public SessionConsole(IRTIConsole console)
     {
         this._console = console;
     }

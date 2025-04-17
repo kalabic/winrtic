@@ -1,10 +1,6 @@
 ﻿#define RUN_SYNC
 
-using Azure.AI.OpenAI;
-using Azure.Identity;
-using OpenAI;
 using OpenAI.RealtimeConversation;
-using System.ClientModel;
 using OpenRTIC.Config;
 using OpenRTIC.Conversation;
 using OpenRTIC.BasicDevices;
@@ -40,9 +36,13 @@ public partial class Program
         // Set UTF-8, handle Ctrl-C, etc.
         InitializeEnvironment();
 
-        // OpenAI.RealtimeConversation client with basically default options.
-        var config = ClientApiConfig.FromEnvironment();
-        var client = GetConfiguredClient(config);
+        // Read client API options from environment variables and nothing else.
+        var config = ConversationOptions.FromEnvironment();
+        if (config._client is null)
+        {
+            RTIConsole.WriteLine("Error: Failed to read environment options.");
+            return;
+        }
 
         //
         // Create devices, register to be notified about some receiverQueueEvents and run!
@@ -50,7 +50,8 @@ public partial class Program
 
         var speaker = new SpeakerAudioStream(ConversationSessionConfig.AudioFormat, GetCancellationToken());
         var microphone = new MicrophoneAudioStream(ConversationSessionConfig.AudioFormat, GetCancellationToken());
-        var updatesReceiver = new ConversationUpdatesReceiverTask(client, microphone, GetCancellationToken());
+        var updatesReceiver = new ConversationUpdatesReceiverTask(GetCancellationToken());
+        updatesReceiver.ConfigureWith(config, microphone);
 
         //
         // A collection of receiverQueueEvents to listen on, will be invoked from a task that is not used
@@ -181,64 +182,5 @@ public partial class Program
         // 'Close' is invoked from 'Dispose' for Stream based classes
         microphone.Dispose();
         speaker.Dispose();
-    }
-
-    private static RealtimeConversationClient GetConfiguredClient(ClientApiConfig options)
-    {
-        switch(options.Type)
-        {
-            case EndpointType.AzureOpenAIWithEntra:
-                return GetConfiguredClientForAzureOpenAIWithEntra(options.AOAIEndpoint, options.AOAIDeployment);
-
-            case EndpointType.AzureOpenAIWithKey:
-                return GetConfiguredClientForAzureOpenAIWithKey(options.AOAIEndpoint, options.AOAIDeployment, options.AOAIApiKey);
-
-            case EndpointType.OpenAIWithKey:
-                return GetConfiguredClientForOpenAIWithKey(options.OAIApiKey);
-        }
-
-        throw new InvalidOperationException(
-                    $"Incomplete or missing environment configuration.Please provide one of:\n"
-                    + " - AZURE_OPENAI_ENDPOINT with AZURE_OPENAI_USE_ENTRA=true or AZURE_OPENAI_API_KEY\n"
-                    + " - OPENAI_API_KEY");
-    }
-
-    private static RealtimeConversationClient GetConfiguredClientForAzureOpenAIWithEntra(
-        string aoaiEndpoint,
-        string? aoaiDeployment)
-    {
-        RTIConsole.WriteLine($" * Connecting to Azure OpenAI endpoint (AZURE_OPENAI_ENDPOINT): {aoaiEndpoint}");
-        RTIConsole.WriteLine($" * Using Entra token-based authentication (AZURE_OPENAI_USE_ENTRA)");
-        RTIConsole.WriteLine(string.IsNullOrEmpty(aoaiDeployment)
-            ? $" * Using no deployment (AZURE_OPENAI_DEPLOYMENT)"
-            : $" * Using deployment (AZURE_OPENAI_DEPLOYMENT): {aoaiDeployment}");
-
-        AzureOpenAIClient aoaiClient = new(new Uri(aoaiEndpoint), new DefaultAzureCredential());
-        return aoaiClient.GetRealtimeConversationClient(aoaiDeployment);
-    }
-
-    private static RealtimeConversationClient GetConfiguredClientForAzureOpenAIWithKey(
-        string aoaiEndpoint,
-        string? aoaiDeployment,
-        string aoaiApiKey)
-    {
-        RTIConsole.WriteLine($" * Connecting to Azure OpenAI endpoint (AZURE_OPENAI_ENDPOINT): {aoaiEndpoint}");
-        RTIConsole.WriteLine($" * Using API key (AZURE_OPENAI_API_KEY): {aoaiApiKey[..5]}**");
-        RTIConsole.WriteLine(string.IsNullOrEmpty(aoaiDeployment)
-            ? $" * Using no deployment (AZURE_OPENAI_DEPLOYMENT)"
-            : $" * Using deployment (AZURE_OPENAI_DEPLOYMENT): {aoaiDeployment}");
-
-        AzureOpenAIClient aoaiClient = new(new Uri(aoaiEndpoint), new ApiKeyCredential(aoaiApiKey));
-        return aoaiClient.GetRealtimeConversationClient(aoaiDeployment);
-    }
-
-    private static RealtimeConversationClient GetConfiguredClientForOpenAIWithKey(string oaiApiKey)
-    {
-        string oaiEndpoint = "https://api.openai.com/v1";
-        RTIConsole.WriteLine($" * Connecting to OpenAI endpoint (OPENAI_ENDPOINT): {oaiEndpoint}");
-        RTIConsole.WriteLine($" * Using API key (OPENAI_API_KEY): {oaiApiKey[..5]}**");
-
-        OpenAIClient aoaiClient = new(new ApiKeyCredential(oaiApiKey));
-        return aoaiClient.GetRealtimeConversationClient("gpt-4o-realtime-preview-2024-10-01");
     }
 }

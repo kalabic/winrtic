@@ -11,7 +11,7 @@ namespace OpenRTIC.Conversation.Devices;
 /// <summary>
 /// A container for all system devices needed for conversation with an AI agent during the session.
 /// </summary>
-public class ConversationDevices
+public class ConversationDevices : IConversationDevices
 {
     public const int CLEAR_ENQUEUED_TIMEOUT = 2000; // Miliseconds
 
@@ -25,7 +25,7 @@ public class ConversationDevices
     /// <param name="console"></param>
     /// <param name="microphoneCancellationToken"></param>
     /// <returns></returns>
-    static public ConversationDevices Start(RTIConsole console, CancellationToken microphoneCancellationToken)
+    static public ConversationDevices Start(IRTIConsole console, CancellationToken microphoneCancellationToken)
     {
         SpeakerAudioStream speakerDevice = new SpeakerAudioStream(ConversationSessionConfig.AudioFormat);
         SessionAudioOutputTask speaker = new SessionAudioOutputTask(speakerDevice);
@@ -36,7 +36,7 @@ public class ConversationDevices
         return new ConversationDevices(speaker, microphoneDevice, sessionConsole);
     }
 
-    public Stream MicrophoneStream { get { return _microphone; } }
+    public Stream GetAudioInput() { return _microphone; }
 
     /// <summary>
     /// This is a task that is observing speaker device and generating events interesting for conversation session.
@@ -54,8 +54,6 @@ public class ConversationDevices
 
     // Only accept chunks of currently enqueued item.
     private ItemAttributes _enqueuedItem = new ItemAttributes();
-
-    private string _transcriptBuffer = "";
 
     protected ConversationDevices(SessionAudioOutputTask speaker,
                                   MicrophoneAudioStream microphone,
@@ -101,11 +99,6 @@ public class ConversationDevices
         });
     }
 
-    public EventCollection GetSessionAudioOutputTaskUpdates()
-    {
-        return _audioOutputTask.TaskEvents;
-    }
-
     public EventCollection GetSessionAudioOutputUpdates()
     {
         return _audioOutputTask.outputAudioUpdates;
@@ -118,45 +111,22 @@ public class ConversationDevices
         return list;
     }
 
-    public void HandleEvent_ItemStreamingDelta(ItemAttributes item, ConversationItemStreamingPartDeltaUpdate update)
-    {
-        if (update.AudioBytes is not null)
-        {
-            EnqueueForPlayback(item, update.AudioBytes);
-        }
-
-        if (!String.IsNullOrEmpty(update.AudioTranscript))
-        {
-            WriteToConsole(item, update.AudioTranscript);
-        }
-    }
-
-    public void ResetSpeakerVolume()
+    private void ResetSpeakerVolume()
     {
         _audioOutputTask.SetVolume(_speakerVolumeNormal);
     }
 
-    public void AdjustSpeakerVolume(float ratio)
+    private void AdjustSpeakerVolume(float ratio)
     {
         _audioOutputTask.SetVolume(_speakerVolumeNormal * ratio);
     }
 
-    public long GetBufferedMs()
-    {
-        return _audioOutputTask.GetDevice().Length;
-    }
-
-    public string GetTranscriptionBuffer()
-    {
-        return _transcriptBuffer;
-    }
-
-    public void SetPlaybackPositionReachedNotification(long milisecondsDelay)
+    private void SetPlaybackPositionReachedNotification(long milisecondsDelay)
     {
         _audioOutputTask.SetPlaybackPositionReachedNotification(milisecondsDelay, _enqueuedItem);
     }
 
-    public void ResetPlaybackPositionReachedNotification()
+    private void ResetPlaybackPositionReachedNotification()
     {
         _audioOutputTask.ResetPlaybackPositionReachedNotification();
     }
@@ -174,7 +144,7 @@ public class ConversationDevices
         return itemCleared;
     }
 
-    public void ClearPlayback()
+    private void ClearPlayback()
     {
         // Once enqueued item is 'cleared', do not accept chunks (stream delta updates) with the same id.
         _clearedItem.Set(_enqueuedItem);
@@ -206,16 +176,6 @@ public class ConversationDevices
                     ClearPlayback();
                 }
             }
-        }
-    }
-
-    public void WriteToConsole(ItemAttributes item, string text)
-    {
-        if (_enqueuedItem.LocalId < item.LocalId)
-        {
-            ClearPlayback();
-            _enqueuedItem.Set(item);
-            _audioOutputTask.NotifyItemEnqueued(_enqueuedItem);
         }
     }
 

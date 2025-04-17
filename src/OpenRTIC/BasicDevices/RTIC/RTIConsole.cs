@@ -5,9 +5,7 @@
 /// </summary>
 public class RTIConsole 
     : IRTIStateCollection
-    , IDeviceNotificationWriter
-    , IRTIOutput
-    , IRTISessionEvents
+    , IRTIConsole
 {
     public IRTIState RTIState_CurrentState { get { return _currentState; } }
 

@@ -17,13 +17,17 @@ public class ConversationUpdatesReceiverTask : IDisposable
 
     private const int STOP_TASK_TIMEOUT = 10000;
 
+    private const int AUDIO_INPUT_STREAM_BUFFER = 4096;
+
+
+
     public EventCollection ReceiverQueueEvents { get { return _receiverQueueEvents; } }
 
     public EventCollection ReceiverEvents { get { return _receiver.ReceiverEvents; } }
 
     public ForwardedEventQueue Queue {  get { return _receiver; } }
 
-    private const int AUDIO_INPUT_STREAM_BUFFER = 4096;
+
 
     private TaskWithEvents? _updatesReceiverTask = null;
 
@@ -33,9 +37,11 @@ public class ConversationUpdatesReceiverTask : IDisposable
 
     private int _audioTaskCount = 0;
 
-    private Stream _audioInputStream;
+    private Stream? _audioInputStream = null;
 
-    private RealtimeConversationClient _client;
+    private RealtimeConversationClient? _client = null;
+
+    private ConversationOptions? _options = null;
 
     private ConversationUpdatesReceiver _receiver;
 
@@ -43,14 +49,10 @@ public class ConversationUpdatesReceiverTask : IDisposable
 
     private EventCollection _receiverQueueEvents = new();
 
-    public ConversationUpdatesReceiverTask(RealtimeConversationClient client,
-                                           Stream audioInputStream,
-                                           CancellationToken cancellation)
+    public ConversationUpdatesReceiverTask(CancellationToken cancellation)
     {
-        this._client = client;
-        this._audioInputStream = audioInputStream;
-        this._receiver = new ConversationUpdatesReceiver();
         this._cancellation = cancellation;
+        this._receiver = new ConversationUpdatesReceiver();
 
         //
         // Events sent from this class.
@@ -65,12 +67,24 @@ public class ConversationUpdatesReceiverTask : IDisposable
             _receiver.NewQueuedEventForwarder<FailedToConnect>((_, _) => HandleEvent_FailedToConnect() ));
     }
 
+    public void ConfigureWith(RealtimeConversationClient client, Stream audioInputStream)
+    {
+        this._client = client;
+        this._audioInputStream = audioInputStream;
+    }
+
+    public void ConfigureWith(ConversationOptions options, Stream audioInputStream)
+    {
+        this._options = options;
+        this._audioInputStream = audioInputStream;
+    }
+
     public void Dispose()
     {
         _updatesReceiverTask?.Dispose();
         _sendAudioTask?.Dispose();
         _inputAudioTask?.Dispose();
-        _audioInputStream.Dispose();
+        _audioInputStream?.Dispose();
         _receiver.Dispose();
     }
 
@@ -175,6 +189,17 @@ public class ConversationUpdatesReceiverTask : IDisposable
 
     private void UpdatesReceiverEntry(CancellationToken receiverTaskCancellation)
     {
+        if ((_client is null) && (_options is not null) && (_options._client is not null))
+        {
+            _client = ConfiguredClient.FromOptions(_options._client);
+        }
+
+        if (_client is null)
+        {
+            _receiver.FailedToConnect("Info: Connection canceled because options are wrong.");
+            return;
+        }
+
         var startCanceller = new CancellationTokenSource();
         var startWatchdog = new ActionTask((watchdogCancellation) =>
         {
@@ -212,8 +237,7 @@ public class ConversationUpdatesReceiverTask : IDisposable
             {
                 // 'startWatchdog' did not trigger cancellation, so reason for exception
                 // cannot be clearly known.
-                _receiver.FailedToConnect("Info: Connection canceled for unknown reason.");
-                _receiver.FailedToConnect(TaskTool.BuildMultiLineExceptionErrorString(ex));
+                _receiver.FailedToConnect("Info: Connection canceled for unknown reason.\n" + TaskTool.BuildMultiLineExceptionErrorString(ex));
             }
             else if (receiverTaskCancellation.IsCancellationRequested || _cancellation.IsCancellationRequested)
             {
@@ -322,7 +346,9 @@ public class ConversationUpdatesReceiverTask : IDisposable
                         !actionCancellation.IsCancellationRequested)
                 {
                     // 'Read' will block until a minimum of data is available.
-                    if ((_audioInputStream.Read(buffer, 0, AUDIO_INPUT_STREAM_BUFFER) > 0) && audioInputBuffer.CanWrite)
+                    if ((_audioInputStream is not null) && 
+                        (_audioInputStream.Read(buffer, 0, AUDIO_INPUT_STREAM_BUFFER) > 0) && 
+                        audioInputBuffer.CanWrite)
                     {
                         audioInputBuffer.Write(buffer, 0, AUDIO_INPUT_STREAM_BUFFER);
                     }

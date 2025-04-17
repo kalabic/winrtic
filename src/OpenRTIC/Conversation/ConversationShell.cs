@@ -1,5 +1,6 @@
 ﻿using OpenAI.RealtimeConversation;
 using OpenRTIC.BasicDevices.RTIC;
+using OpenRTIC.Config;
 using OpenRTIC.Conversation.Devices;
 using OpenRTIC.MiniTaskLib;
 using System.Diagnostics;
@@ -11,7 +12,7 @@ namespace OpenRTIC.Conversation;
 /// <summary>
 /// WIP
 /// </summary>
-public partial class ConversationShell : IConversationSessionInfo, IDisposable
+public partial class ConversationShell : IDisposable
 {
     private ConversationUpdatesReceiverTask _updatesReceiver;
 
@@ -20,7 +21,7 @@ public partial class ConversationShell : IConversationSessionInfo, IDisposable
     /// </summary>
     private readonly Dictionary<string, ConversationStreamItem> _streamItemMap = new Dictionary<string, ConversationStreamItem>();
 
-    private readonly ConversationDevices _devices;
+    private readonly IConversationDevices _devices;
 
     private readonly Stopwatch _speechWatch = new Stopwatch();
 
@@ -32,16 +33,29 @@ public partial class ConversationShell : IConversationSessionInfo, IDisposable
         return id;
     }
 
-    protected ConversationShell(RTIConsole console, RealtimeConversationClient client)
+    protected ConversationShell(IRTIConsole console, RealtimeConversationClient client)
         : this(console, client, CancellationToken.None)
     { }
 
-    protected ConversationShell(RTIConsole console, 
+    protected ConversationShell(IRTIConsole console,
                                 RealtimeConversationClient client,
                                 CancellationToken cancellation)
     {
         _devices = ConversationDevices.Start(console, cancellation);
-        _updatesReceiver = new ConversationUpdatesReceiverTask(client, _devices.MicrophoneStream, cancellation);
+        _updatesReceiver = new ConversationUpdatesReceiverTask(cancellation);
+        _updatesReceiver.ConfigureWith(client, _devices.GetAudioInput());
+
+        ConnectDeviceEventHandlers();
+        ConnectConversationUpdateHandlers();
+    }
+
+    protected ConversationShell(IRTIConsole console,
+                                ConversationOptions options,
+                                CancellationToken cancellation)
+    {
+        _devices = ConversationDevices.Start(console, cancellation);
+        _updatesReceiver = new ConversationUpdatesReceiverTask(cancellation);
+        _updatesReceiver.ConfigureWith(options, _devices.GetAudioInput());
 
         ConnectDeviceEventHandlers();
         ConnectConversationUpdateHandlers();
@@ -67,7 +81,7 @@ public partial class ConversationShell : IConversationSessionInfo, IDisposable
         return _updatesReceiver.GetAwaiter();
     }
 
-    public EventForwarder<TMessage> NewQueuedEventForwarder<TMessage>(EventHandler<TMessage> eventHandler)
+    private EventForwarder<TMessage> NewQueuedEventForwarder<TMessage>(EventHandler<TMessage> eventHandler)
     {
         // Make this event arrive from a dedicated task in updates receiver.
         return _updatesReceiver.Queue.NewQueuedEventForwarder<TMessage>(eventHandler);
@@ -143,7 +157,10 @@ public partial class ConversationShell : IConversationSessionInfo, IDisposable
             if (_streamItemMap.ContainsKey(update.ItemId))
             {
                 var item = _streamItemMap[update.ItemId];
-                _devices.HandleEvent_ItemStreamingDelta(item.Attrib, update);
+                if (update.AudioBytes is not null)
+                {
+                    _devices.EnqueueForPlayback(item.Attrib, update.AudioBytes);
+                }
             }
 #if DEBUG
             else
@@ -178,25 +195,5 @@ public partial class ConversationShell : IConversationSessionInfo, IDisposable
 
         // Maybe of interest, so return total elapsed cancelling time.
         return stopwatch.ElapsedMilliseconds + finishDevicesMs;
-    }
-
-    public void CancelCurrentSession()
-    {
-        _updatesReceiver.Cancel();
-    }
-
-    public long GetPlaybackBufferMs()
-    {
-        return _devices.GetBufferedMs();
-    }
-
-    public long GetTimeSinceSpeechStartedMs()
-    {
-        return _speechWatch.ElapsedMilliseconds;
-    }
-
-    public string GetTranscriptionBuffer()
-    {
-        return _devices.GetTranscriptionBuffer();
     }
 }
